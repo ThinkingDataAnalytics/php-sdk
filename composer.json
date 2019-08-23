@@ -1,0 +1,21 @@
+{
+  "name": "thinkinggame/ta-php-sdk",
+  "type": "library",
+  "homepage": "http://www.thinkingdata.cn",
+  "description": "PHP SDK for thinkingdata Analytics",
+  "keywords": ["sdk", "thinkingdata"],
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "shushu",
+      "email": "quanjie@thinkingdata.cn"
+    }
+  ],
+  "require": {
+    "php": ">=5.5.0"
+  },
+  "autoload": {
+    "files": ["TaPhpSdk.php"]
+  },
+  "minimum-stability": "stable"
+}
