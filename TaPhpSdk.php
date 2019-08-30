@@ -5,7 +5,7 @@
  * Date: 2018/8/2
  * Time: 17:14
  */
-define('SDK_VERSION', '1.0.2');
+define('SDK_VERSION', '1.0.3');
 //Exception
 class ThinkingDataException extends \Exception {
 }
@@ -146,28 +146,10 @@ class ThinkingDataAnalytics{
                 if ($value instanceof DateTime) {
                     $data['properties'][$key] = $value->format("Y-m-d H:i:s");
                 }
-//                if (is_string($value) && strlen($value) > 8191) {
-//                    throw new ThinkingDataException("the max length of property value is 8191. [key=$key]");
-//                }
-//                // 如果是数组，只支持 Value 是字符串格式的简单非关联数组
-//                if (is_array($value)) {
-//                    if (array_values($value) !== $value) {
-//                        throw new ThinkingDataException("[list] property must not be associative. [key='$key']");
-//                    }
-//                    foreach ($value as $lvalue) {
-//                        if (!is_string($lvalue)) {
-//                            throw new ThinkingDataException("[list] property's value must be a str. [value='$lvalue']");
-//                        }
-//                    }
-//                }
             }
         }else {
             throw new ThinkingDataException("property must be an array.");
         }
-            // XXX: 解决 PHP 中空 array() 转换成 JSON [] 的问题
-//            if (count($properties) == 0) {
-//                $properties = new \ArrayObject();
-//            }
     }
     /**
      * @return datetime : Y-m-d h:i:s
@@ -249,30 +231,50 @@ class FileConsumer extends AbstractConsumer {
     private $file_handler;
     private $file_name;
     private $file_directory;
+    private $file_size;
+    /**
+     * FileConsumer constructor.
+     * @param string $file_directory
+     * 实现构造函数重载
+     */
+    function __construct(){
+        $a = func_get_args();
+        $i = count($a);
+        if (method_exists($this,$f='__construct'.$i)) {
+            call_user_func_array(array($this,$f),$a);
+        }
+    }
     /**
      * 实例化一个fileconsume对象
      * @param $file_directory 文件保存目录
      **/
-    function __construct($file_directory='.')
+    function __construct1($file_directory='.')
     {
         $this->file_directory = $file_directory;
+        $this->file_size = 1024;
         $this->file_name = $this->getFileName();
-        $this->file_handler = fopen($this->file_directory.'/log.'.$this->file_name,'a+');
+    }
+    /**
+     * @param $file_directory 文件保存目录
+     * @param $file_size 文件大小
+     */
+    function __construct2($file_directory,$file_size){
+        $this->file_directory = $file_directory;
+        $this->file_size = $file_size;
+        $this->file_name = $this->getFileName();
     }
 
-    public function send($message)
-    {
-
+    public function send($message){
         $file_name = $this->getFileName();
-        if($this->file_name != $file_name){
+        if($this->file_handler != null && $this->file_name != $file_name){
             $this->close();
             $this->file_name = $file_name;
-            $this->file_handler = fopen($this->file_directory.'/log.'.$this->file_name,'a+');
+            $this->file_handler = null;
         }
-        if ($this->file_handler === null) {
-            return false;
+        if($this->file_handler === null){
+            $this->file_handler = fopen($file_name,'a+');
         }
-        return fwrite($this->file_handler, $message . "\n") === false ? false : true;
+        return fwrite($this->file_handler, $message ."\n");
     }
     public function close()
     {
@@ -282,7 +284,23 @@ class FileConsumer extends AbstractConsumer {
         return fclose($this->file_handler);
     }
     private function getFileName(){
-        return date('Y-m-d',time());
+        $file_base = $this->file_directory.'/log.'.date('Y-m-d',time())."_";
+        $count = 0;
+        $file_complete =$file_base.$count;
+        while (file_exists($file_complete) &&$this->fileSizeOut($file_complete)){
+            $count += 1;
+            $file_complete = $file_base.$count;
+        }
+        return $file_complete;
+    }
+    public function fileSizeOut($fp){
+        clearstatcache();
+        $fpsize = filesize($fp)/(1024*1024);
+        if($fpsize >= $this->file_size){
+            return true;
+        }else{
+            return false;
+        }
     }
 }
 //直接发送到服务器
