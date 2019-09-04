@@ -5,7 +5,7 @@
  * Date: 2018/8/2
  * Time: 17:14
  */
-define('SDK_VERSION', '1.0.3');
+define('SDK_VERSION', '1.0.4');
 //Exception
 class ThinkingDataException extends \Exception {
 }
@@ -126,6 +126,9 @@ class ThinkingDataAnalytics{
                 return;
             }
             foreach ($properties as $key => $value) {
+                if(is_null($value)){
+                    continue;
+                }
                 if (!is_string($key)) {
                     throw new ThinkingDataException("property key must be a str. [key=$key]");
                 }
@@ -325,14 +328,16 @@ class BatchConsumer extends AbstractConsumer{
         $this->_max_size = $max_size;
         $this->_request_timeout = $request_timeout;
     }
+    public function __destruct() {
+        $this->flush();
+    }
 
     public function send($message)
     {
         $this->_buffers[] = $message;
         if (count($this->_buffers) >= $this->_max_size) {
-            return $this->flush();
+             $this->flush();
         }
-        return true;
     }
 
     public function flush()
@@ -349,7 +354,7 @@ class BatchConsumer extends AbstractConsumer{
     }
     public function close()
     {
-        return $this->flush();
+        $this->flush();
     }
     private function _do_request($message_array){
 
@@ -384,12 +389,23 @@ class BatchConsumer extends AbstractConsumer{
             $curl_info= curl_getinfo($ch);
 
             curl_close($ch);
-            if(($curl_info['http_code'] == 200) && ($json['code'] == 0)){
-                return true;
+            if(($curl_info['http_code'] == 200)){
+                if($json['code'] == 0){
+                    return true;
+                }else if($json['code'] == -2){
+                    echo new ThinkingDataNetWorkException("传输数据失败，appid 不合法,code = -2");
+                }else if($json['code'] == -3){
+                    echo new ThinkingDataNetWorkException("传输数据失败，非法上报IP,code = -3");
+                }else{
+                    echo new ThinkingDataNetWorkException("传输数据失败 code =".$json['code']);
+                }
+            }else{
+                echo new ThinkingDataNetWorkException("传输数据失败，请检查接收的url或appid");
             }
-            throw new ThinkingDataNetWorkException("传输数据失败，请检查接收的url或appid");
+            return false;
         }  catch (Exception $e){
-            throw $e;
+            echo 'Message: ' .$e->getMessage();
+            return false;
         }
     }
 }
