@@ -5,120 +5,127 @@
  * Date: 2018/8/2
  * Time: 17:14
  */
-define('SDK_VERSION', '1.0.4');
-//Exception
+define('SDK_VERSION', '1.1.0');
+
+/**
+ * 数据格式错误异常
+ */
 class ThinkingDataException extends \Exception {
 }
+
+/**
+ * 网络异常
+ */
 class ThinkingDataNetWorkException extends \Exception {
 }
-//ThinkingDataAnalytics
-class ThinkingDataAnalytics{
+
+class ThinkingDataAnalytics {
     private $_consumer;
     private $_public_properties;
     private $_is_win;
-    function __construct($consumer){
-        if(strtoupper(substr(PHP_OS,0,3)) == "WIN"){
+
+    function __construct($consumer) {
+        if (strtoupper(substr(PHP_OS, 0, 3)) == "WIN") {
             $this->_is_win = true;
         }
         $this->_consumer = $consumer;
         $this->clear_public_properties();
     }
+
     /**
-     *
-     * @param string $distinct_id
-     * @param string $account_id
-     * @param array $properties
+     * 设置用户属性, 覆盖之前设置的属性.
+     * @param string $distinct_id 访客 ID
+     * @param string $account_id 账户 ID
+     * @param array $properties 用户属性
      * @return boolean
      * @throws Exception 数据传输，或者写文件失败
-     * */
-    public function user_set($distinct_id,$account_id,$properties = array()){
-        return $this->_add($distinct_id,$account_id,'user_set',null,$properties);
+     */
+    public function user_set($distinct_id, $account_id, $properties = array()) {
+        return $this->_add($distinct_id, $account_id, 'user_set', null, $properties);
     }
+
     /**
-     *
-     * @param string $distinct_id
-     * @param string $account_id
-     * @param array $properties
+     * 设置用户属性, 如果属性已经存在, 则操作无效.
+     * @param string $distinct_id 访客 ID
+     * @param string $account_id 账户 ID
+     * @param array $properties 用户属性
      * @return boolean
      * @throws Exception 数据传输，或者写文件失败
-     * */
-    public function user_setOnce($distinct_id,$account_id,$properties = array()){
-        return $this->_add($distinct_id,$account_id,'user_setOnce',null,$properties);
+     */
+    public function user_setOnce($distinct_id, $account_id, $properties = array()) {
+        return $this->_add($distinct_id, $account_id, 'user_setOnce', null, $properties);
     }
+
     /**
-     *
-     * @param string $distinct_id
-     * @param string $account_id
-     * @param array $properties
+     * 修改数值类型的用户属性.
+     * @param string $distinct_id 访客 ID
+     * @param string $account_id 账户 ID
+     * @param array $properties 用户属性, 其值需为 Number 类型
      * @return boolean
      * @throws Exception 数据传输，或者写文件失败
-     * */
-    public function user_add($distinct_id,$account_id,$properties = array()){
-        return $this->_add($distinct_id,$account_id,'user_add',null,$properties);
+     */
+    public function user_add($distinct_id, $account_id, $properties = array()) {
+        return $this->_add($distinct_id, $account_id, 'user_add', null, $properties);
     }
+
     /**
-     *
-     * @param string $distinct_id
-     * @param string $account_id
-     * @param array $properties
+     * 删除用户, 此操作不可逆, 请谨慎使用.
+     * @param string $distinct_id 访客 ID
+     * @param string $account_id 账户 ID
      * @return boolean
      * @throws Exception 数据传输，或者写文件失败
-     * */
-    public function user_del($distinct_id,$account_id,$properties = array()){
-        return $this->_add($distinct_id,$account_id,'user_del',null,$properties);
+     */
+    public function user_del($distinct_id, $account_id) {
+        return $this->_add($distinct_id, $account_id, 'user_del', null, array());
     }
+
     /**
-     *
-     * @param string $distinct_id
-     * @param string $account_id
-     * @param string $event_name
-     * @param array $properties
+     * 上报事件.
+     * @param string $distinct_id 访客 ID
+     * @param string $account_id 账户 ID
+     * @param string $event_name 事件名称
+     * @param array $properties 事件属性
      * @return boolean
      * @throws Exception 数据传输，或者写文件失败
-     * */
-    public function track($distinct_id,$account_id,$event_name,$properties = array()){
-        return $this->_add($distinct_id,$account_id,'track',$event_name,$properties);
+     */
+    public function track($distinct_id, $account_id, $event_name, $properties = array()) {
+        return $this->_add($distinct_id, $account_id, 'track', $event_name, $properties);
     }
-    /**
-     *
-     * @param string $distinct_id
-     * @param string $account_id
-     * @param string $type
-     * @param string $event_name
-     * @param array $properties
-     * @return boolean
-     * @throws Exception 数据传输，或者写文件失败
-     * */
-    private function _add($distinct_id,$account_id,$type,$event_name,$properties){
+
+    private function _add($distinct_id, $account_id, $type, $event_name, $properties) {
         $event = array();
-        if(!is_null($event_name) && !is_string($event_name)){
+        if (!is_null($event_name) && !is_string($event_name)) {
             throw new ThinkingDataException("event name must be a str.");
         }
-        if(!$distinct_id && !$account_id){
+        if (!$distinct_id && !$account_id) {
             throw new ThinkingDataException("account_id 和 distinct_id 不能同时为空");
         }
-        if($distinct_id){
+        if ($distinct_id) {
             $event['#distinct_id'] = $distinct_id;
         }
-        if($account_id){
+        if ($account_id) {
             $event['#account_id'] = $account_id;
         }
-        if($event_name){
+        if ($event_name) {
             $event['#event_name'] = $event_name;
         }
-        if($type == 'track'){
-            $properties = array_merge($properties,$this->_public_properties);
+        if ($type == 'track') {
+            $properties = array_merge($properties, $this->_public_properties);
         }
         $event['#type'] = $type;
         $event['#ip'] = $this->_extract_ip($properties);
         $event['#time'] = $this->_extract_user_time($properties);
 
         //检查properties
-        $this->_assert_properties($type,$properties);
-        $event['properties'] = $properties;
+        $this->_assert_properties($type, $properties);
+        if (count($properties) > 0) {
+            $event['properties'] = $properties;
+        }
+
         return $this->_consumer->send(json_encode($event));
     }
-    private function _assert_properties($type,$properties){
+
+    private function _assert_properties($type, $properties) {
         // 检查 properties
         if (is_array($properties)) {
             $name_pattern = "/^(#|[a-z])[a-z0-9_]{0,49}$/i";
@@ -126,7 +133,7 @@ class ThinkingDataAnalytics{
                 return;
             }
             foreach ($properties as $key => $value) {
-                if(is_null($value)){
+                if (is_null($value)) {
                     continue;
                 }
                 if (!is_string($key)) {
@@ -142,7 +149,7 @@ class ThinkingDataAnalytics{
                 if (!is_scalar($value) && !$value instanceof DateTime) {
                     throw new ThinkingDataException("property value must be a str/int/float/datetime. [key='$key']");
                 }
-                if($type == 'user_add' && !is_numeric($value)){
+                if ($type == 'user_add' && !is_numeric($value)) {
                     throw new ThinkingDataException("Type user_add only support Number [key='$key']");
                 }
                 // 如果是 DateTime，Format 成字符串
@@ -150,17 +157,15 @@ class ThinkingDataAnalytics{
                     $data['properties'][$key] = $value->format("Y-m-d H:i:s");
                 }
             }
-        }else {
+        } else {
             throw new ThinkingDataException("property must be an array.");
         }
     }
-    /**
-     * @return datetime : Y-m-d h:i:s
-     *
-     **/
-    public function getDatetime(){
-        return  date('Y-m-d H:i:s',time());
+
+    public function getDatetime() {
+        return  date('Y-m-d H:i:s', time());
     }
+
     private function _extract_user_time(&$properties = array()) {
         if (array_key_exists('#time', $properties)) {
             $time = $properties['#time'];
@@ -169,6 +174,7 @@ class ThinkingDataAnalytics{
         }
         return $this->getDatetime();
     }
+
     private function _extract_ip(&$properties = array()) {
         if (array_key_exists('#ip', $properties)) {
             $ip = $properties['#ip'];
@@ -179,106 +185,104 @@ class ThinkingDataAnalytics{
     }
 
     /**
-     * 清理公共属性
-     **/
+     * 清空公共属性
+     */
     public function clear_public_properties() {
         $this->_public_properties = array(
             '#lib' => 'tga_php_sdk',
             '#lib_version' => SDK_VERSION,
         );
     }
+
     /**
      * 设置每个事件都带有的一些公共属性
      *
-     * @param super_properties
+     * @param $super_properties 公共属性
      */
     public function register_public_properties($super_properties) {
         $this->_public_properties = array_merge($this->_public_properties, $super_properties);
     }
+
     /**
      * 立即刷新
      */
-    public function flush(){
+    public function flush() {
         $this->_consumer->flush();
     }
+
     /**
-     *关闭sdk接口
+     * 关闭 sdk 接口
      */
-    public function close(){
+    public function close() {
         $this->_consumer->close();
     }
 
-}//抽象类
-abstract class AbstractConsumer{
+}
+
+abstract class AbstractConsumer {
     /**
-     * 发送一条消息,返回true为send成功。
+     * 发送一条消息, 返回true为send成功。
      * @param string $message 发送的消息体
      * @return bool
      */
     public abstract function send($message);
+
     /**
      * 立即发送所有未发出的数据。
      * @return bool
      */
-    public function flush(){
-
+    public function flush() {
     }
+
     /**
      * 关闭 Consumer 并释放资源。
      * @return bool
      */
     public abstract function close();
 }
-//保存为本地文件
+
+/**
+ * 批量实时写本地文件，文件以天为分隔，需要与 LogBus 搭配使用进行数据上传. 建议使用，不支持多线程
+ */
 class FileConsumer extends AbstractConsumer {
     private $file_handler;
     private $file_name;
     private $file_directory;
     private $file_size;
+    private $rotate_hourly;
+
     /**
-     * FileConsumer constructor.
-     * @param string $file_directory
-     * 实现构造函数重载
+     * 创建指定文件保存目录和指定单个日志文件大小的 FileConsumer
+     *
+     * @param string $file_directory 日志文件保存目录. 默认为当前目录
+     * @param int $file_size 单个日志文件大小. 单位 MB, 默认为 1024 MB
+     * @param bool $rotate_hourly 是否按小时切分文件，默认1024MB切分大小
      */
-    function __construct(){
-        $a = func_get_args();
-        $i = count($a);
-        if (method_exists($this,$f='__construct'.$i)) {
-            call_user_func_array(array($this,$f),$a);
-        }
-    }
-    /**
-     * 实例化一个fileconsume对象
-     * @param $file_directory 文件保存目录
-     **/
-    function __construct1($file_directory='.')
-    {
-        $this->file_directory = $file_directory;
-        $this->file_size = 1024;
-        $this->file_name = $this->getFileName();
-    }
-    /**
-     * @param $file_directory 文件保存目录
-     * @param $file_size 文件大小
-     */
-    function __construct2($file_directory,$file_size){
+    function __construct($file_directory = '.', $file_size = 1024, $rotate_hourly = false) {
         $this->file_directory = $file_directory;
         $this->file_size = $file_size;
+        $this->rotate_hourly = $rotate_hourly;
         $this->file_name = $this->getFileName();
     }
 
-    public function send($message){
+    /**
+     * 消费数据，将数据追加到本地日志文件
+     * @param $message
+     * @return bool|int
+     */
+    public function send($message) {
         $file_name = $this->getFileName();
-        if($this->file_handler != null && $this->file_name != $file_name){
+        if ($this->file_handler != null && $this->file_name != $file_name) {
             $this->close();
             $this->file_name = $file_name;
             $this->file_handler = null;
         }
-        if($this->file_handler === null){
-            $this->file_handler = fopen($file_name,'a+');
+        if ($this->file_handler === null) {
+            $this->file_handler = fopen($file_name, 'a+');
         }
         return fwrite($this->file_handler, $message ."\n");
     }
+
     public function close()
     {
         if ($this->file_handler === null) {
@@ -286,41 +290,48 @@ class FileConsumer extends AbstractConsumer {
         }
         return fclose($this->file_handler);
     }
-    private function getFileName(){
-        $file_base = $this->file_directory.'/log.'.date('Y-m-d',time())."_";
+
+    private function getFileName() {
+        $date_format = $this->rotate_hourly ? 'Y-m-d-H' : 'Y-m-d';
+        $file_base = $this->file_directory.'/log.'.date($date_format, time())."_";
         $count = 0;
         $file_complete =$file_base.$count;
-        while (file_exists($file_complete) &&$this->fileSizeOut($file_complete)){
+        while (file_exists($file_complete) &&$this->fileSizeOut($file_complete)) {
             $count += 1;
             $file_complete = $file_base.$count;
         }
         return $file_complete;
     }
-    public function fileSizeOut($fp){
+
+    public function fileSizeOut($fp) {
         clearstatcache();
-        $fpsize = filesize($fp)/(1024*1024);
-        if($fpsize >= $this->file_size){
+        $fpsize = filesize($fp) / (1024 * 1024);
+        if ($fpsize >= $this->file_size) {
             return true;
-        }else{
+        } else {
             return false;
         }
     }
 }
-//直接发送到服务器
-class BatchConsumer extends AbstractConsumer{
+
+/**
+ * 批量实时地向TA服务器传输数据，不需要搭配传输工具. 不建议在生产环境中使用，不支持多线程
+ */
+class BatchConsumer extends AbstractConsumer {
     private $_url;
     private $_appid;
     private $_buffers;
     private $_max_size;
     private $_request_timeout;
+
     /**
-     * 实例化一个BatchConsumer对象
-     * @param $server_url 服务端接口url
-     * @param $appid 项目appid
-     * @param $max_size 最大的flush值，默认为50
-     * @param $request_timeout http的timeout，默认1000s
+     * 创建给定配置的 BatchConsumer 对象
+     * @param $server_url 接收端 url
+     * @param $appid 项目 APP ID
+     * @param $max_size 最大的 flush 值，默认为 50
+     * @param $request_timeout http 的 timeout，默认 1000s
      */
-    function __construct($server_url,$appid,$max_size=50,$request_timeout=1000)
+    function __construct($server_url, $appid, $max_size = 50, $request_timeout = 1000)
     {
         $this->_buffers = array();
         $this->_url = $server_url;
@@ -328,12 +339,12 @@ class BatchConsumer extends AbstractConsumer{
         $this->_max_size = $max_size;
         $this->_request_timeout = $request_timeout;
     }
+
     public function __destruct() {
         $this->flush();
     }
 
-    public function send($message)
-    {
+    public function send($message) {
         $this->_buffers[] = $message;
         if (count($this->_buffers) >= $this->_max_size) {
              $this->flush();
@@ -342,70 +353,150 @@ class BatchConsumer extends AbstractConsumer{
 
     public function flush()
     {
-         if (empty($this->_buffers)) {
+        if (empty($this->_buffers)) {
             $ret = false;
         } else {
              $ret = $this->_do_request($this->_buffers);
-         }
+        }
         if ($ret) {
             $this->_buffers = array();
         }
-        return $ret;
     }
-    public function close()
-    {
+
+    public function close() {
         $this->flush();
     }
-    private function _do_request($message_array){
 
+    private function _do_request($message_array) {
         try{
             $ch = curl_init($this->_url);
             //参数设置
-            curl_setopt($ch,CURLOPT_POST,1);
+            curl_setopt($ch, CURLOPT_POST, 1);
             curl_setopt($ch, CURLOPT_HEADER, 0);
-            curl_setopt($ch,CURLOPT_CONNECTTIMEOUT,6000);
-            curl_setopt($ch,CURLOPT_RETURNTRANSFER,1);
-            curl_setopt($ch,CURLOPT_TIMEOUT,$this->_request_timeout);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 6000);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+            curl_setopt($ch, CURLOPT_TIMEOUT, $this->_request_timeout);
 
             //传输的数据
-            $data = base64_encode(gzencode("[" . implode(",", $message_array) . "]"));
+            $data = base64_encode(gzencode("[" . implode(", ", $message_array) . "]"));
 
-            curl_setopt($ch,CURLOPT_POSTFIELDS,$data);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
 
             //headers
-            curl_setopt($ch,CURLOPT_HTTPHEADER,array("User-Agent:ta-php-sdk","appid:".$this->_appid,"compress:gzip",'Content-Type: application/json'));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, array("User-Agent:ta-php-sdk", "appid:".$this->_appid, "compress:gzip", 'Content-Type: text/plain'));
 
             //https
             $pos = strpos($this->_url, "https");
             if ($pos === 0) {
                 curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
             }
+
             //发送请求
             $result = curl_exec($ch);
 
             //解析返回值
-            $json = json_decode($result,true);
+            $json = json_decode($result, true);
 
             $curl_info= curl_getinfo($ch);
 
             curl_close($ch);
-            if(($curl_info['http_code'] == 200)){
-                if($json['code'] == 0){
+            if ($curl_info['http_code'] == 200) {
+                if ($json['code'] == 0) {
                     return true;
-                }else if($json['code'] == -2){
-                    echo new ThinkingDataNetWorkException("传输数据失败，appid 不合法,code = -2");
-                }else if($json['code'] == -3){
-                    echo new ThinkingDataNetWorkException("传输数据失败，非法上报IP,code = -3");
-                }else{
-                    echo new ThinkingDataNetWorkException("传输数据失败 code =".$json['code']);
+                } else if ($json['code'] == -1) {
+                    echo new ThinkingDataNetWorkException("传输数据失败，数据格式不合法, code = -1");
+                } else if ($json['code'] == -2) {
+                    echo new ThinkingDataNetWorkException("传输数据失败，APP ID 不合法, code = -2");
+                } else if ($json['code'] == -3) {
+                    echo new ThinkingDataNetWorkException("传输数据失败，非法上报 IP, code = -3");
+                } else {
+                    echo new ThinkingDataNetWorkException("传输数据失败 code = ".$json['code']);
                 }
-            }else{
-                echo new ThinkingDataNetWorkException("传输数据失败，请检查接收的url或appid");
+            } else {
+                echo new ThinkingDataNetWorkException("传输数据失败，请检查接收端 URL. HTTP code: ".$curl_info['http_code']);
             }
             return false;
-        }  catch (Exception $e){
+        } catch (Exception $e) {
             echo 'Message: ' .$e->getMessage();
             return false;
+        }
+    }
+}
+
+/**
+ * 逐条传输数据，如果发送失败则抛出异常
+ */
+class DebugConsumer extends AbstractConsumer {
+    private $_url;
+    private $_appid;
+    private $_request_timeout;
+
+    /**
+     * 创建给定配置的 DebugConsumer 对象
+     * @param $server_url 接收端 url
+     * @param $appid 项目 APP ID
+     * @param $request_timeout http 的 timeout，默认 1000s
+     */
+    function __construct($server_url, $appid, $request_timeout = 1000) {
+        $parsed_url = parse_url($server_url);
+        if ($parsed_url === false) {
+            throw new ThinkingDataException("Invalid server url");
+        }
+
+        $this->_url = $parsed_url['scheme'] . "://" .$parsed_url['host']
+        .((isset($parsed_url['port'])) ? ':' . $parsed_url['port'] : '')
+        . '/sync_data';
+
+        $this->_appid = $appid;
+        $this->_request_timeout = $request_timeout;
+    }
+
+    public function send($message) {
+        $this->_do_request($message);
+    }
+
+    public function flush() {
+    }
+
+    public function close() {
+    }
+
+    private function _do_request($message) {
+        $ch = curl_init($this->_url);
+        $data = "debug=1&appid=".$this->_appid."&data=".urlencode($message);
+
+        //参数设置
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_HEADER, 0);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 6000);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->_request_timeout);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+
+        //https
+        $pos = strpos($this->_url, "https");
+        if ($pos === 0) {
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        }
+
+        //发送请求
+        $result = curl_exec($ch);
+
+        //解析返回值
+        $json = json_decode($result, true);
+
+        $curl_info= curl_getinfo($ch);
+
+        curl_close($ch);
+        if ($curl_info['http_code'] == 200) {
+            if ($json['code'] == 0) {
+                return true;
+            } else {
+                echo "\nUnexpected Return Code ". $json['code']. " for: " . $message . "\n";
+                throw new ThinkingDataException($json['msg']);
+            }
+        } else {
+            throw new ThinkingDataNetWorkException("传输数据失败，请检查接收端 URL. HTTP code: ".$curl_info['http_code']);
         }
     }
 }

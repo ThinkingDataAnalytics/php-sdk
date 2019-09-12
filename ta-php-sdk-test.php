@@ -6,11 +6,15 @@
  */
 require 'TaPhpSdk.php';
 date_default_timezone_set("Asia/Shanghai");
-//使用 FileConsumer
-//$ta = new ThinkingDataAnalytics(new FileConsumer("I:\log\logdata",2)); //使用文件大小拆分文件,单位是MB
-//$ta = new ThinkingDataAnalytics(new FileConsumer("I:\log\logdata")); //默认是1024M 大小一个文件
-//使用BatchConsumer
+
+//使用 FileConsumer  建议使用
+//$ta = new ThinkingDataAnalytics(new FileConsumer("I:\log\logdata",2)); //使用文件大小拆分文件,单位是MB,默认是1024MB 不按小时切分
+//$ta = new ThinkingDataAnalytics(new FileConsumer("I:\log\logdata",1024,true));//按小时切分，文件名类似：log.日期-小时_数值（log.2019-09-12-15_0） 数值是文件切分的索引，默认大小是1024
+//$ta = new ThinkingDataAnalytics(new FileConsumer("I:\log\logdata")); //默认是1024M 大小一个文件,且不按小时切分
+
+//使用BatchConsumer  适用于小规模的数据
 $ta = new ThinkingDataAnalytics(new BatchConsumer('您的上报地址', '您的APPID'));
+
 // 1. 用户匿名访问网站
 $distinct_id = 'SDIF21dEJWsI232IdSJ232d2332'; // 用户未登录时，可以使用产品自己生成的cookieId等唯一标识符来标注用户
 $properties = array();
@@ -28,6 +32,7 @@ $properties = array();
 $properties['register_time'] = date('Y-m-d H:i:s', strtotime('2018-01-06 10:32:52'));
 $ta->track($distinct_id, $account_id, "signup", $properties);//事件的名称只能以字母开头，可包含数字，字母和下划线“_”，长度最大为50个字符，对字母大小写不敏感。不能以#等关键符号开头
 $ta->flush();
+
 //更多接口的用法见 http://www.thinkinggame.cn/manual.html?u=http://doc.thinkinggame.cn/tgamanual/installation/php_sdk_installation.html
 ////3.注册用户的基本资料
 $properties = array(
