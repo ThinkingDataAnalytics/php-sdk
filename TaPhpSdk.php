@@ -5,7 +5,7 @@
  * Date: 2018/8/2
  * Time: 17:14
  */
-define('SDK_VERSION', '1.1.0');
+define('SDK_VERSION', '1.1.1');
 
 /**
  * 数据格式错误异常
@@ -162,8 +162,15 @@ class ThinkingDataAnalytics {
         }
     }
 
-    public function getDatetime() {
-        return  date('Y-m-d H:i:s', time());
+    public function getDatetime(){
+        return $this->getFormatDate('Y-m-d H:i:s.u');
+    }
+
+    function getFormatDate($format = 'Y-m-d H:i:s.u'){
+        $utimestamp = microtime(true);
+        $timestamp = floor($utimestamp);
+        $milliseconds = round(($utimestamp - $timestamp) * 1000);
+        return date(preg_replace('`(?<!\\\\)u`', sprintf("%03d",$milliseconds), $format), $timestamp);
     }
 
     private function _extract_user_time(&$properties = array()) {

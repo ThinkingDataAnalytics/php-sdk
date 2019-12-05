@@ -8,7 +8,7 @@
 ```json
 {
     "require": {
-        "thinkinggame/ta-php-sdk": "v1.1.0"
+        "thinkinggame/ta-php-sdk": "v1.1.1"
     }
 }
 ```
