@@ -7,48 +7,60 @@
 require 'TaPhpSdk.php';
 date_default_timezone_set("Asia/Shanghai");
 
-//使用 FileConsumer  建议使用
-//$ta = new ThinkingDataAnalytics(new FileConsumer("I:\log\logdata",2)); //使用文件大小拆分文件,单位是MB,默认是1024MB 不按小时切分
-//$ta = new ThinkingDataAnalytics(new FileConsumer("I:\log\logdata",1024,true));//按小时切分，文件名类似：log.日期-小时_数值（log.2019-09-12-15_0） 数值是文件切分的索引，默认大小是1024
-//$ta = new ThinkingDataAnalytics(new FileConsumer("I:\log\logdata")); //默认是1024M 大小一个文件,且不按小时切分
+////一、使用 FileConsumer  建议使用
+////1.2.0版本（包括）以后去除默认大小为1024MB切分的功能,默认按日切分，可配置
+////下面可选择以下两种初始化
 
-//使用BatchConsumer  适用于小规模的数据
-$ta = new ThinkingDataAnalytics(new BatchConsumer('您的上报地址', '您的APPID'));
+////(1)TA初始化1
+
+////无大小切分，默认按照天切分，文件大小无限大(不影响),一般大的数据量推荐这个
+//$ta = new ThinkingDataAnalytics(new FileConsumer("I:/log/logdata"));
+////按大小切分,单位为MB
+//$ta = new ThinkingDataAnalytics(new FileConsumer("I:/log/logdata",2048));
+
+////(2)TA初始化2
+////下面为可选配置项，可不设置，数据量一般大推荐都不设置，大数据量级 推荐是否按小时，大小切分二选一，
+/// 默认是false，代表按天切分,文件名类似：log.日期-小时_数值（log.2019-09-12_0），file_size默认是0，代表当天无限大,单位MB
+//$ta = new ThinkingDataAnalytics(new FileConsumer("I:/log/logdata",0,true));//代表按小时切分，0代表无大小切分，是否按小时切分
+
+//二、使用BatchConsumer  适用于小规模的数据，适用于少量历史数据的导入,可与逻辑代码解耦
+//try {
+//    //初始化BatchConsumer
+//    $batchConsumer = new BatchConsumer("url", "appid");//必填
+//    //无以下需求，可不调用该以下函数
+//    $batchConsumer -> setCompress(false);//选填，是否压缩,默认压缩gzip，如果是内网传输，推荐false
+//    $batchConsumer ->setFlushSize(10);//选填，默认是20条flush一次
+//    //初始化TA
+//    $ta = new ThinkingDataAnalytics($batchConsumer);
+//} catch (ThinkingDataException $e) {
+//}
+
+//三、使用DebugConsumer 用于查看数据格式是否正确，一条一条的发送，禁止线上环境使用！！！
+//DebugConsumer初始化
+try {
+    $debugConsumer = new DebugConsumer("https://sdk.tga.thinkinggame.cn", "1244e1334b46480fa78ee6dfccbe8f3f");
+    $debugConsumer->setDebugOnly(false);//选填，debug是否写入TA库,默认写入
+    $ta = new ThinkingDataAnalytics($debugConsumer);
+} catch (ThinkingDataException $e) {
+}
 
 // 1. 用户匿名访问网站
+$account_id = 1111;
 $distinct_id = 'SDIF21dEJWsI232IdSJ232d2332'; // 用户未登录时，可以使用产品自己生成的cookieId等唯一标识符来标注用户
 $properties = array();
-$properties['#time'] = date('Y-m-d H:i:s', time());
-$properties['#os'] = 'Windows';
-$properties['#os_version'] = '8';
-$properties['#ip'] = '123.123.123.123';
-$properties['Channel'] = 'baidu';
-$ta->track($distinct_id, null, 'ViewHomePage', $properties);
-$ta->flush();//当上报为BatchConsumer时，未上报50条，需要手动触发刷新数据,如果不调用，程序结束后，析构函数也会调用该flush接口
-
-//2.用户注册
-$account_id = "account_id";   //用户登录后，用户的唯一标识
-$properties = array();
-$properties['register_time'] = date('Y-m-d H:i:s', strtotime('2018-01-06 10:32:52'));
-$ta->track($distinct_id, $account_id, "signup", $properties);//事件的名称只能以字母开头，可包含数字，字母和下划线“_”，长度最大为50个字符，对字母大小写不敏感。不能以#等关键符号开头
-$ta->flush();
-
-//更多接口的用法见 http://www.thinkinggame.cn/manual.html?u=http://doc.thinkinggame.cn/tgamanual/installation/php_sdk_installation.html
-////3.注册用户的基本资料
-$properties = array(
-    'name' => 'user_name',
-    'age' => 25,
-    "level" => 10,
-);
-$ta->user_setOnce(null, $account_id, $properties);
-$ta->flush();
-
-//4.年龄改为20
-$properties = array();
 $properties['age'] = 20;
+//$properties['#time'] = date('Y-m-d H:i:s', time());//可以自己上传#event_time发生时刻，不传默认是当前时间,默认上传毫秒级
+$properties['Product_Name'] = 'c';
 $properties['update_time'] = date('Y-m-d H:i:s', time());
-$ta->user_set(null, $account_id, $properties);
+$ta->track($distinct_id, $account_id, "viewPage", $properties);
+$ta->user_set($distinct_id, $account_id, $properties);
 $ta->flush();
+
+//删除某一个用户的几个用户属性,比如age,update_time,
+$properties1 = array(
+    'age',"update_time"
+);
+$ta->user_unset(null, $account_id, $properties1);
 
 //5.level增加了3级(降了用-3),只支持数字数据
 $properties = array();
@@ -87,7 +99,7 @@ $properties['Product_Name'] = 'e';
 $ta->track(null, $account_id, "Browse_Product", $properties);
 $ta->flush();
 //10.删除用户
-$ta->user_del(null, $account_id);
+//$ta->user_del(null, $account_id);
 $ta->flush();
 try {
     $ta->close(); //最后关闭整个服务
