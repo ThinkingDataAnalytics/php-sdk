@@ -194,6 +194,10 @@ class ThinkingDataAnalytics
         $utimestamp = microtime(true);
         $timestamp = floor($utimestamp);
         $milliseconds = round(($utimestamp - $timestamp) * 1000);
+        if( $milliseconds == 1000){
+            $timestamp = strtotime("+1second",$timestamp);
+            $milliseconds = 0;
+        }
         return date(preg_replace('`(?<!\\\\)u`', sprintf("%03d", $milliseconds), $format), $timestamp);
     }
 
