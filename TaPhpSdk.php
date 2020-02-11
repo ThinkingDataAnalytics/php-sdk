@@ -3,7 +3,7 @@
  * Date: 2018/8/2
  * Time: 17:14
  */
-define('SDK_VERSION', '1.2.0');
+define('SDK_VERSION', '1.3.0');
 
 /**
  * 数据格式错误异常
@@ -68,12 +68,24 @@ class ThinkingDataAnalytics
     {
         return $this->_add($distinct_id, $account_id, 'user_add', null, $properties);
     }
+    /**
+     * 追加一个用户的某一个或者多个集合
+     * @param string $distinct_id 访客 ID
+     * @param string $account_id 账户 ID
+     * @param array $properties key上传的是非关联数组
+     * @return boolean
+     * @throws Exception 数据传输，或者写文件失败
+     */
+    public function user_append($distinct_id, $account_id, $properties = array())
+    {
+        return $this->_add($distinct_id, $account_id, 'user_append', null, $properties);
+    }
 
     /**
      * 删除用户属性
      * @param string $distinct_id 访客 ID
      * @param string $account_id 账户 ID
-     * @param array $properties key上传的是删除的用户属性，value上传 0 即可
+     * @param array $properties key上传的是删除的用户属性
      * @return boolean
      * @throws Exception 数据传输，或者写文件失败
      */
@@ -136,9 +148,14 @@ class ThinkingDataAnalytics
         $event['#type'] = $type;
         $event['#ip'] = $this->_extract_ip($properties);
         $event['#time'] = $this->_extract_user_time($properties);
+        //#uuid需要标准格式 xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx
+        if (array_key_exists('#uuid', $properties)) {
+            $event['#uuid'] = $properties['#uuid'];
+            unset($properties['#uuid']);
+        }
 
         //检查properties
-        $this->_assert_properties($type, $properties);
+        $properties = $this->_assert_properties($type, $properties);
         if (count($properties) > 0) {
             $event['properties'] = $properties;
         }
@@ -154,7 +171,7 @@ class ThinkingDataAnalytics
             if (!$properties) {
                 return;
             }
-            foreach ($properties as $key => $value) {
+            foreach ($properties as $key => &$value) {
                 if (is_null($value)) {
                     continue;
                 }
@@ -167,29 +184,40 @@ class ThinkingDataAnalytics
                 if (!preg_match($name_pattern, $key)) {
                     throw new ThinkingDataException("property key must be a valid variable name. [key='$key']]");
                 }
-                // 只支持简单类型或DateTime类
-                if (!is_scalar($value) && !$value instanceof DateTime) {
-                    throw new ThinkingDataException("property value must be a str/int/float/datetime. [key='$key']");
+                if (!is_scalar($value) && !$value instanceof DateTime && !is_array($value)) {
+                    throw new ThinkingDataException("property value must be a str/int/float/datetime/array. [key='$key']");
                 }
                 if ($type == 'user_add' && !is_numeric($value)) {
                     throw new ThinkingDataException("Type user_add only support Number [key='$key']");
                 }
                 // 如果是 DateTime，Format 成字符串
                 if ($value instanceof DateTime) {
-                    $data['properties'][$key] = $value->format("Y-m-d H:i:s");
+                    $properties[$key] = $this->getFormatDate( $value->getTimestamp());
+                }
+                //如果是数组
+                if(is_array($value)){
+                    if (array_values($value) !== $value) {
+                        throw new ThinkingDataException("[array] property must not be associative. [key='$key']");
+                    }
+                    for($i = 0 ; $i < count($value) ; $i++) {
+                        if ($value[$i] instanceof DateTime) {
+                            $value[$i] =$this->getFormatDate( $value[$i]->getTimestamp());
+                        }
+                    }
                 }
             }
         } else {
             throw new ThinkingDataException("property must be an array.");
         }
+        return $properties;
     }
 
     public function getDatetime()
     {
-        return $this->getFormatDate('Y-m-d H:i:s.u');
+        return $this->getFormatDate(null,'Y-m-d H:i:s.u');
     }
 
-    function getFormatDate($format = 'Y-m-d H:i:s.u')
+    function getFormatDate($time = null,$format = 'Y-m-d H:i:s.u')
     {
         $utimestamp = microtime(true);
         $timestamp = floor($utimestamp);
@@ -198,7 +226,11 @@ class ThinkingDataAnalytics
             $timestamp = strtotime("+1second",$timestamp);
             $milliseconds = 0;
         }
-        return date(preg_replace('`(?<!\\\\)u`', sprintf("%03d", $milliseconds), $format), $timestamp);
+        $new_format = preg_replace('`(?<!\\\\)u`', sprintf("%03d", $milliseconds), $format);
+        if($time !== null){
+            return date($new_format, $time);
+        }
+        return date($new_format, $timestamp);
     }
 
     private function _extract_user_time(&$properties = array())
