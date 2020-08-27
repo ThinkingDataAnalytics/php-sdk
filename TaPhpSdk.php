@@ -3,7 +3,7 @@
  * Date: 2018/8/2
  * Time: 17:14
  */
-define('SDK_VERSION', '1.3.0');
+define('SDK_VERSION', '1.4.0');
 
 /**
  * 数据格式错误异常
@@ -23,10 +23,12 @@ class ThinkingDataAnalytics
 {
     private $_consumer;
     private $_public_properties;
+    private $_enableUUID;
 
-    function __construct($consumer)
+    function __construct($consumer,$enableUUID = false)
     {
         $this->_consumer = $consumer;
+        $this->_enableUUID = $enableUUID;
         $this->clear_public_properties();
     }
 
@@ -40,7 +42,7 @@ class ThinkingDataAnalytics
      */
     public function user_set($distinct_id, $account_id, $properties = array())
     {
-        return $this->_add($distinct_id, $account_id, 'user_set', null, $properties);
+        return $this->_add($distinct_id, $account_id, 'user_set', null,null, $properties);
     }
 
     /**
@@ -53,7 +55,7 @@ class ThinkingDataAnalytics
      */
     public function user_setOnce($distinct_id, $account_id, $properties = array())
     {
-        return $this->_add($distinct_id, $account_id, 'user_setOnce', null, $properties);
+        return $this->_add($distinct_id, $account_id, 'user_setOnce', null,null, $properties);
     }
 
     /**
@@ -66,7 +68,7 @@ class ThinkingDataAnalytics
      */
     public function user_add($distinct_id, $account_id, $properties = array())
     {
-        return $this->_add($distinct_id, $account_id, 'user_add', null, $properties);
+        return $this->_add($distinct_id, $account_id, 'user_add', null,null, $properties);
     }
     /**
      * 追加一个用户的某一个或者多个集合
@@ -78,7 +80,7 @@ class ThinkingDataAnalytics
      */
     public function user_append($distinct_id, $account_id, $properties = array())
     {
-        return $this->_add($distinct_id, $account_id, 'user_append', null, $properties);
+        return $this->_add($distinct_id, $account_id, 'user_append', null,null, $properties);
     }
 
     /**
@@ -95,7 +97,7 @@ class ThinkingDataAnalytics
             throw new ThinkingDataException("property cannot be empty .");
         }
         $arr = array_fill_keys($properties, 0);
-        return $this->_add($distinct_id, $account_id, 'user_unset', null, $arr);
+        return $this->_add($distinct_id, $account_id, 'user_unset', null,null, $arr);
     }
 
     /**
@@ -107,7 +109,7 @@ class ThinkingDataAnalytics
      */
     public function user_del($distinct_id, $account_id)
     {
-        return $this->_add($distinct_id, $account_id, 'user_del', null, array());
+        return $this->_add($distinct_id, $account_id, 'user_del', null,null, array());
     }
 
     /**
@@ -121,10 +123,40 @@ class ThinkingDataAnalytics
      */
     public function track($distinct_id, $account_id, $event_name, $properties = array())
     {
-        return $this->_add($distinct_id, $account_id, 'track', $event_name, $properties);
+        return $this->_add($distinct_id, $account_id, 'track', $event_name,null, $properties);
     }
 
-    private function _add($distinct_id, $account_id, $type, $event_name, $properties)
+    /**
+     * 上报事件.
+     * @param string $distinct_id 访客 ID
+     * @param string $account_id 账户 ID
+     * @param string $event_name 事件名称
+     * @param string $event_id 事件ID
+     * @param array $properties 事件属性
+     * @return boolean
+     * @throws Exception 数据传输，或者写文件失败
+     */
+    public function track_update($distinct_id, $account_id, $event_name,$event_id, $properties = array())
+    {
+        return $this->_add($distinct_id, $account_id, 'track_update', $event_name,$event_id, $properties);
+    }
+
+    /**
+     * 上报事件.
+     * @param string $distinct_id 访客 ID
+     * @param string $account_id 账户 ID
+     * @param string $event_name 事件名称
+     * @param string $event_id 事件ID
+     * @param array $properties 事件属性
+     * @return boolean
+     * @throws Exception 数据传输，或者写文件失败
+     */
+    public function track_overwrite($distinct_id, $account_id, $event_name,$event_id, $properties = array())
+    {
+        return $this->_add($distinct_id, $account_id, 'track_overwrite', $event_name,$event_id, $properties);
+    }
+
+    private function _add($distinct_id, $account_id, $type, $event_name,$event_id, $properties)
     {
         $event = array();
         if (!is_null($event_name) && !is_string($event_name)) {
@@ -144,6 +176,14 @@ class ThinkingDataAnalytics
         }
         if ($type == 'track') {
             $properties = array_merge($properties, $this->_public_properties);
+            if (array_key_exists('#first_check_id', $properties)) {
+                $event['#first_check_id'] = $properties['#first_check_id'];
+                unset($properties['#first_check_id']);
+            }
+        }
+        if( $type == 'track_update' || $type == 'track_overwrite'){
+            $properties = array_merge($properties, $this->_public_properties);
+            $event['#event_id'] = $event_id;
         }
         $event['#type'] = $type;
         $event['#ip'] = $this->_extract_ip($properties);
@@ -152,6 +192,8 @@ class ThinkingDataAnalytics
         if (array_key_exists('#uuid', $properties)) {
             $event['#uuid'] = $properties['#uuid'];
             unset($properties['#uuid']);
+        }elseif ($this->_enableUUID){
+            $event['#uuid'] = $this->uuid();
         }
 
         //检查properties
@@ -251,6 +293,17 @@ class ThinkingDataAnalytics
             return $ip;
         }
         return '';
+    }
+
+    function  uuid()
+    {
+        $chars = md5(uniqid(mt_rand(), true));
+        $uuid = substr ( $chars, 0, 8 ) . '-'
+            . substr ( $chars, 8, 4 ) . '-'
+            . substr ( $chars, 12, 4 ) . '-'
+            . substr ( $chars, 16, 4 ) . '-'
+            . substr ( $chars, 20, 12 );
+        return $uuid ;
     }
 
     /**
@@ -490,7 +543,7 @@ class BatchConsumer extends AbstractConsumer
             $compressType = $this->compress ? "gzip" : "none";
             curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
             //headers
-            curl_setopt($ch, CURLOPT_HTTPHEADER, array("User-Agent:ta-php-sdk", "appid:" . $this->_appid, "compress:" .$compressType, 'Content-Type: text/plain'));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, array("TA-Integration-Type:PHP","TA-Integration-Version:".SDK_VERSION, "TA-Integration-Count:".count($message_array),"appid:" .$this->_appid, "compress:" .$compressType, 'Content-Type: text/plain'));
 
             //https
             $pos = strpos($this->_url, "https");
