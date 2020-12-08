@@ -38,8 +38,7 @@ date_default_timezone_set("Asia/Shanghai");
 //三、使用DebugConsumer 用于查看数据格式是否正确，一条一条的发送，禁止线上环境使用！！！
 //DebugConsumer初始化
 try {
-    $debugConsumer = new DebugConsumer("https://tga.thinkinggame.cn", "134b46480fa78ee6dfccbe8f3f");
-    $debugConsumer->setDebugOnly(true);//选填，debug是否写入TA库,默认写入
+    $debugConsumer = new FileConsumer("/Users/sunzeyu/Work/test/test/", 0, false, "test");
     $ta = new ThinkingDataAnalytics($debugConsumer);
 } catch (ThinkingDataException $e) {
     echo $e;
@@ -53,11 +52,11 @@ $properties['age'] = 20;
 //$properties['#time'] = date('Y-m-d H:i:s', time());//可以自己上传#event_time发生时刻，不传默认是当前时间,默认上传毫秒级
 $properties['Product_Name'] = 'c';
 $properties['update_time'] = date('Y-m-d H:i:s', time());
-try{
+try {
     $ta->track($distinct_id, $account_id, "viewPage", $properties);
     $ta->user_set($distinct_id, $account_id, $properties);
     $ta->flush();
-}catch (Exception $e){
+} catch (Exception $e) {
     //handle except
     echo $e;
 }
@@ -67,32 +66,32 @@ $properties = array();
 $properties['age1'] = 10;
 $properties['bri'] = '2010-10-10';
 $properties['money'] = 300;
-$properties['arrkey1']=['str1','str2'];
-try{
+$properties['arrkey1'] = ['str1', 'str2'];
+try {
     $ta->user_set($distinct_id, $account_id, $properties);
-}catch (Exception $e){
+} catch (Exception $e) {
     //handle except
     echo $e;
 }
 
 //user_append 追加一个用户的某一个或者多个集合
-try{
+try {
     //user_set 设置用户属性
     $properties = array();
-    $properties['arrkey1'] = ['str3','str4'];//为集合类型追加多个值，key-array形式，array里面都是字符串类型
+    $properties['arrkey1'] = ['str3', 'str4'];//为集合类型追加多个值，key-array形式，array里面都是字符串类型
     $ta->user_append($distinct_id, $account_id, $properties);
-}catch (Exception $e){
+} catch (Exception $e) {
     //handle except
     echo $e;
 }
 
 //user_unset 删除某一个用户的几个用户属性,比如age,update_time,
 $properties1 = array(
-    'age',"update_time"
+    'age', "update_time"
 );
-try{
+try {
     $ta->user_unset(null, $account_id, $properties1);
-}catch (Exception $e){
+} catch (Exception $e) {
     //handle except
     echo $e;
 }
@@ -101,10 +100,10 @@ try{
 //5.level增加了3级(降了用-3),只支持数字数据
 $properties = array();
 $properties['level'] = 12.21123;
-try{
+try {
     $ta->user_add(null, $account_id, $properties);
     $ta->flush();
-}catch (Exception $e){
+} catch (Exception $e) {
     //handle except
     echo $e;
 }
@@ -121,10 +120,10 @@ $properties = array();
 $properties['shopping_time'] = date('Y-m-d H:i:s', strtotime('2018-01-06 10:32:52'));
 $properties['Product_Name'] = 'a';
 $properties['OrderId'] = "order_id_a";
-try{
+try {
     $ta->track(null, $account_id, "Product_Purchase", $properties);
     $ta->flush();
-}catch (Exception $e){
+} catch (Exception $e) {
     //handle except
     echo $e;
 }
@@ -133,10 +132,10 @@ $properties = array();
 $properties['shopping_time'] = date('Y-m-d H:i:s', strtotime('2018-01-06 10:32:52'));
 $properties['Product_Name'] = 'b';
 $properties['OrderId'] = "order_id_b";
-try{
+try {
     $ta->track(null, $account_id, "Product_Purchase", $properties);
     $ta->flush();
-}catch (Exception $e){
+} catch (Exception $e) {
     echo $e;
 }
 
@@ -147,10 +146,10 @@ $ta->clear_public_properties();
 //9.用户有浏览了e商品
 $properties = array();
 $properties['Product_Name'] = 'e';
-try{
+try {
     $ta->track(null, $account_id, "Browse_Product", $properties);
     $ta->flush();
-}catch (Exception $e){
+} catch (Exception $e) {
     echo $e;
 }
 

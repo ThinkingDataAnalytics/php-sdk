@@ -1,3 +1,7 @@
+**v1.5.0** (2020/12/07)
+- LoggerConsumer 增加指定目录不存在时自动创建
+- LoggerConsumer 增加文件锁配置
+
 **v1.4.0** (2020/08/26)
 - 新增track_update接口，支持可更新事件
 - 新增track_overwrite接口，支持可重写事件

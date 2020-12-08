@@ -3,7 +3,7 @@
  * Date: 2018/8/2
  * Time: 17:14
  */
-define('SDK_VERSION', '1.4.0');
+define('SDK_VERSION', '1.5.0');
 
 /**
  * 数据格式错误异常
@@ -25,7 +25,7 @@ class ThinkingDataAnalytics
     private $_public_properties;
     private $_enableUUID;
 
-    function __construct($consumer,$enableUUID = false)
+    function __construct($consumer, $enableUUID = false)
     {
         $this->_consumer = $consumer;
         $this->_enableUUID = $enableUUID;
@@ -42,7 +42,7 @@ class ThinkingDataAnalytics
      */
     public function user_set($distinct_id, $account_id, $properties = array())
     {
-        return $this->_add($distinct_id, $account_id, 'user_set', null,null, $properties);
+        return $this->_add($distinct_id, $account_id, 'user_set', null, null, $properties);
     }
 
     /**
@@ -55,7 +55,7 @@ class ThinkingDataAnalytics
      */
     public function user_setOnce($distinct_id, $account_id, $properties = array())
     {
-        return $this->_add($distinct_id, $account_id, 'user_setOnce', null,null, $properties);
+        return $this->_add($distinct_id, $account_id, 'user_setOnce', null, null, $properties);
     }
 
     /**
@@ -68,8 +68,9 @@ class ThinkingDataAnalytics
      */
     public function user_add($distinct_id, $account_id, $properties = array())
     {
-        return $this->_add($distinct_id, $account_id, 'user_add', null,null, $properties);
+        return $this->_add($distinct_id, $account_id, 'user_add', null, null, $properties);
     }
+
     /**
      * 追加一个用户的某一个或者多个集合
      * @param string $distinct_id 访客 ID
@@ -80,7 +81,7 @@ class ThinkingDataAnalytics
      */
     public function user_append($distinct_id, $account_id, $properties = array())
     {
-        return $this->_add($distinct_id, $account_id, 'user_append', null,null, $properties);
+        return $this->_add($distinct_id, $account_id, 'user_append', null, null, $properties);
     }
 
     /**
@@ -97,7 +98,7 @@ class ThinkingDataAnalytics
             throw new ThinkingDataException("property cannot be empty .");
         }
         $arr = array_fill_keys($properties, 0);
-        return $this->_add($distinct_id, $account_id, 'user_unset', null,null, $arr);
+        return $this->_add($distinct_id, $account_id, 'user_unset', null, null, $arr);
     }
 
     /**
@@ -109,7 +110,7 @@ class ThinkingDataAnalytics
      */
     public function user_del($distinct_id, $account_id)
     {
-        return $this->_add($distinct_id, $account_id, 'user_del', null,null, array());
+        return $this->_add($distinct_id, $account_id, 'user_del', null, null, array());
     }
 
     /**
@@ -123,7 +124,7 @@ class ThinkingDataAnalytics
      */
     public function track($distinct_id, $account_id, $event_name, $properties = array())
     {
-        return $this->_add($distinct_id, $account_id, 'track', $event_name,null, $properties);
+        return $this->_add($distinct_id, $account_id, 'track', $event_name, null, $properties);
     }
 
     /**
@@ -136,9 +137,9 @@ class ThinkingDataAnalytics
      * @return boolean
      * @throws Exception 数据传输，或者写文件失败
      */
-    public function track_update($distinct_id, $account_id, $event_name,$event_id, $properties = array())
+    public function track_update($distinct_id, $account_id, $event_name, $event_id, $properties = array())
     {
-        return $this->_add($distinct_id, $account_id, 'track_update', $event_name,$event_id, $properties);
+        return $this->_add($distinct_id, $account_id, 'track_update', $event_name, $event_id, $properties);
     }
 
     /**
@@ -151,12 +152,12 @@ class ThinkingDataAnalytics
      * @return boolean
      * @throws Exception 数据传输，或者写文件失败
      */
-    public function track_overwrite($distinct_id, $account_id, $event_name,$event_id, $properties = array())
+    public function track_overwrite($distinct_id, $account_id, $event_name, $event_id, $properties = array())
     {
-        return $this->_add($distinct_id, $account_id, 'track_overwrite', $event_name,$event_id, $properties);
+        return $this->_add($distinct_id, $account_id, 'track_overwrite', $event_name, $event_id, $properties);
     }
 
-    private function _add($distinct_id, $account_id, $type, $event_name,$event_id, $properties)
+    private function _add($distinct_id, $account_id, $type, $event_name, $event_id, $properties)
     {
         $event = array();
         if (!is_null($event_name) && !is_string($event_name)) {
@@ -181,7 +182,7 @@ class ThinkingDataAnalytics
                 unset($properties['#first_check_id']);
             }
         }
-        if( $type == 'track_update' || $type == 'track_overwrite'){
+        if ($type == 'track_update' || $type == 'track_overwrite') {
             $properties = array_merge($properties, $this->_public_properties);
             $event['#event_id'] = $event_id;
         }
@@ -192,7 +193,7 @@ class ThinkingDataAnalytics
         if (array_key_exists('#uuid', $properties)) {
             $event['#uuid'] = $properties['#uuid'];
             unset($properties['#uuid']);
-        }elseif ($this->_enableUUID){
+        } elseif ($this->_enableUUID) {
             $event['#uuid'] = $this->uuid();
         }
 
@@ -234,16 +235,16 @@ class ThinkingDataAnalytics
                 }
                 // 如果是 DateTime，Format 成字符串
                 if ($value instanceof DateTime) {
-                    $properties[$key] = $this->getFormatDate( $value->getTimestamp());
+                    $properties[$key] = $this->getFormatDate($value->getTimestamp());
                 }
                 //如果是数组
-                if(is_array($value)){
+                if (is_array($value)) {
                     if (array_values($value) !== $value) {
                         throw new ThinkingDataException("[array] property must not be associative. [key='$key']");
                     }
-                    for($i = 0 ; $i < count($value) ; $i++) {
+                    for ($i = 0; $i < count($value); $i++) {
                         if ($value[$i] instanceof DateTime) {
-                            $value[$i] =$this->getFormatDate( $value[$i]->getTimestamp());
+                            $value[$i] = $this->getFormatDate($value[$i]->getTimestamp());
                         }
                     }
                 }
@@ -256,20 +257,20 @@ class ThinkingDataAnalytics
 
     public function getDatetime()
     {
-        return $this->getFormatDate(null,'Y-m-d H:i:s.u');
+        return $this->getFormatDate(null, 'Y-m-d H:i:s.u');
     }
 
-    function getFormatDate($time = null,$format = 'Y-m-d H:i:s.u')
+    function getFormatDate($time = null, $format = 'Y-m-d H:i:s.u')
     {
         $utimestamp = microtime(true);
         $timestamp = floor($utimestamp);
         $milliseconds = round(($utimestamp - $timestamp) * 1000);
-        if( $milliseconds == 1000){
-            $timestamp = strtotime("+1second",$timestamp);
+        if ($milliseconds == 1000) {
+            $timestamp = strtotime("+1second", $timestamp);
             $milliseconds = 0;
         }
         $new_format = preg_replace('`(?<!\\\\)u`', sprintf("%03d", $milliseconds), $format);
-        if($time !== null){
+        if ($time !== null) {
             return date($new_format, $time);
         }
         return date($new_format, $timestamp);
@@ -295,15 +296,15 @@ class ThinkingDataAnalytics
         return '';
     }
 
-    function  uuid()
+    function uuid()
     {
         $chars = md5(uniqid(mt_rand(), true));
-        $uuid = substr ( $chars, 0, 8 ) . '-'
-            . substr ( $chars, 8, 4 ) . '-'
-            . substr ( $chars, 12, 4 ) . '-'
-            . substr ( $chars, 16, 4 ) . '-'
-            . substr ( $chars, 20, 12 );
-        return $uuid ;
+        $uuid = substr($chars, 0, 8) . '-'
+            . substr($chars, 8, 4) . '-'
+            . substr($chars, 12, 4) . '-'
+            . substr($chars, 16, 4) . '-'
+            . substr($chars, 20, 12);
+        return $uuid;
     }
 
     /**
@@ -377,8 +378,10 @@ class FileConsumer extends AbstractConsumer
     private $file_handler;
     private $file_name;
     private $file_directory;
+    private $file_prefix;
     private $file_size;
     private $rotate_hourly;
+    private $progress;
 
     /**
      * 创建指定文件保存目录和指定单个日志文件大小的 FileConsumer
@@ -386,12 +389,17 @@ class FileConsumer extends AbstractConsumer
      * @param string $file_directory 日志文件保存目录. 默认为当前目录
      * @param int $file_size 单个日志文件大小. 单位 MB, 无默认大小
      * @param bool $rotate_hourly 是否按小时切分文件
+     * @param string $file_prefix 生成的日志文件前缀
      */
-    function __construct($file_directory = '.', $file_size = 0, $rotate_hourly = false)
+    function __construct($file_directory = '.', $file_size = 0, $rotate_hourly = false, $file_prefix = '')
     {
         $this->file_directory = $file_directory;
+        if (!is_dir($file_directory)) {
+            mkdir($file_directory, 0777, true);
+        }
         $this->file_size = $file_size;
         $this->rotate_hourly = $rotate_hourly;
+        $this->file_prefix = $file_prefix;
         $this->file_name = $this->getFileName();
     }
 
@@ -411,6 +419,13 @@ class FileConsumer extends AbstractConsumer
         if ($this->file_handler === null) {
             $this->file_handler = fopen($file_name, 'a+');
         }
+        if ($this->progress) {
+            if (flock($this->file_handler, LOCK_EX)) {
+                $result = fwrite($this->file_handler, $message . "\n");
+                flock($this->file_handler, LOCK_UN);
+                return $result;
+            }
+        }
         return fwrite($this->file_handler, $message . "\n");
     }
 
@@ -425,7 +440,8 @@ class FileConsumer extends AbstractConsumer
     private function getFileName()
     {
         $date_format = $this->rotate_hourly ? 'Y-m-d-H' : 'Y-m-d';
-        $file_base = $this->file_directory . '/log.' . date($date_format, time()) . "_";
+        $file_prefix = $this->file_prefix == '' ? '' : $this->file_prefix . '.';
+        $file_base = $this->file_directory . '/' . $file_prefix . 'log.' . date($date_format, time()) . "_";
         $count = 0;
         $file_complete = $file_base . $count;
         if ($this->file_size > 0) {
@@ -435,6 +451,11 @@ class FileConsumer extends AbstractConsumer
             }
         }
         return $file_complete;
+    }
+
+    public function setProgress($progress)
+    {
+        $this->progress = $progress;
     }
 
     public function fileSizeOut($fp)
@@ -535,15 +556,15 @@ class BatchConsumer extends AbstractConsumer
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
             curl_setopt($ch, CURLOPT_TIMEOUT, $this->_request_timeout);
 
-            if ( $this->compress) {
+            if ($this->compress) {
                 $data = gzencode("[" . implode(", ", $message_array) . "]");
-            }else{
+            } else {
                 $data = "[" . implode(", ", $message_array) . "]";
             }
             $compressType = $this->compress ? "gzip" : "none";
             curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
             //headers
-            curl_setopt($ch, CURLOPT_HTTPHEADER, array("TA-Integration-Type:PHP","TA-Integration-Version:".SDK_VERSION, "TA-Integration-Count:".count($message_array),"appid:" .$this->_appid, "compress:" .$compressType, 'Content-Type: text/plain'));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, array("TA-Integration-Type:PHP", "TA-Integration-Version:" . SDK_VERSION, "TA-Integration-Count:" . count($message_array), "appid:" . $this->_appid, "compress:" . $compressType, 'Content-Type: text/plain'));
 
             //https
             $pos = strpos($this->_url, "https");
