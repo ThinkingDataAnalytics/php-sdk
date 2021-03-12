@@ -38,7 +38,7 @@ date_default_timezone_set("Asia/Shanghai");
 //三、使用DebugConsumer 用于查看数据格式是否正确，一条一条的发送，禁止线上环境使用！！！
 //DebugConsumer初始化
 try {
-    $debugConsumer = new FileConsumer("/Users/sunzeyu/Work/test/test/", 0, false, "test");
+    $debugConsumer = new DebugConsumer("http://localhost:8091", "appid", false);
     $ta = new ThinkingDataAnalytics($debugConsumer);
 } catch (ThinkingDataException $e) {
     echo $e;
@@ -55,7 +55,7 @@ $properties['update_time'] = date('Y-m-d H:i:s', time());
 try {
     $ta->track($distinct_id, $account_id, "viewPage", $properties);
     $ta->user_set($distinct_id, $account_id, $properties);
-    $ta->flush();
+//    $ta->flush();
 } catch (Exception $e) {
     //handle except
     echo $e;
@@ -102,7 +102,7 @@ $properties = array();
 $properties['level'] = 12.21123;
 try {
     $ta->user_add(null, $account_id, $properties);
-    $ta->flush();
+//    $ta->flush();
 } catch (Exception $e) {
     //handle except
     echo $e;
@@ -122,7 +122,7 @@ $properties['Product_Name'] = 'a';
 $properties['OrderId'] = "order_id_a";
 try {
     $ta->track(null, $account_id, "Product_Purchase", $properties);
-    $ta->flush();
+//    $ta->flush();
 } catch (Exception $e) {
     //handle except
     echo $e;
@@ -148,18 +148,16 @@ $properties = array();
 $properties['Product_Name'] = 'e';
 try {
     $ta->track(null, $account_id, "Browse_Product", $properties);
-    $ta->flush();
+//    $ta->flush();
 } catch (Exception $e) {
     echo $e;
 }
 
 //10.删除用户
 //$ta->user_del(null, $account_id);
-$ta->flush();
+//$ta->flush();
 try {
     $ta->close(); //最后关闭整个服务
 } catch (Exception $e) {
     echo 'error' . PHP_EOL;
 }
-
-?>

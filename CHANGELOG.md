@@ -1,3 +1,6 @@
+**v1.6.0** (2021/03/12)
+- BatchConsumer 增加上传失败缓存 
+
 **v1.5.0** (2020/12/07)
 - LoggerConsumer 增加指定目录不存在时自动创建
 - LoggerConsumer 增加文件锁配置
