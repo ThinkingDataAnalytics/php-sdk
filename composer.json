@@ -3,7 +3,10 @@
   "type": "library",
   "homepage": "http://www.thinkingdata.cn",
   "description": "PHP SDK for thinkingdata Analytics",
-  "keywords": ["sdk", "thinkingdata"],
+  "keywords": [
+    "sdk",
+    "thinkingdata"
+  ],
   "license": "MIT",
   "authors": [
     {
@@ -18,7 +21,9 @@
     "ext-json": "*"
   },
   "autoload": {
-    "files": ["TaPhpSdk.php"]
+    "files": [
+      "TaPhpSdk.php"
+    ]
   },
   "minimum-stability": "stable"
 }

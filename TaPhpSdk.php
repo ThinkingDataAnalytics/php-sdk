@@ -3,7 +3,7 @@
  * Date: 2018/8/2
  * Time: 17:14
  */
-define('SDK_VERSION', '1.6.0');
+define('SDK_VERSION', '1.8.0');
 
 /**
  * 数据格式错误异常
@@ -124,6 +124,9 @@ class ThinkingDataAnalytics
      */
     public function track($distinct_id, $account_id, $event_name, $properties = array())
     {
+        if (!$event_name) {
+            throw new ThinkingDataException("track方法event_name不能为空");
+        }
         return $this->add($distinct_id, $account_id, 'track', $event_name, null, $properties);
     }
 
@@ -139,6 +142,12 @@ class ThinkingDataAnalytics
      */
     public function track_update($distinct_id, $account_id, $event_name, $event_id, $properties = array())
     {
+        if (!$event_name) {
+            throw new ThinkingDataException("track_update方法event_name不能为空");
+        }
+        if (!$event_id) {
+            throw new ThinkingDataException("track_update方法event_id不能为空");
+        }
         return $this->add($distinct_id, $account_id, 'track_update', $event_name, $event_id, $properties);
     }
 
@@ -154,14 +163,30 @@ class ThinkingDataAnalytics
      */
     public function track_overwrite($distinct_id, $account_id, $event_name, $event_id, $properties = array())
     {
+        if (!$event_name) {
+            throw new ThinkingDataException("track_overwrite方法event_name不能为空");
+        }
+        if (!$event_id) {
+            throw new ThinkingDataException("track_overwrite方法event_id不能为空");
+        }
         return $this->add($distinct_id, $account_id, 'track_overwrite', $event_name, $event_id, $properties);
     }
 
+    /**
+     * @param $distinct_id
+     * @param $account_id
+     * @param $type
+     * @param $event_name
+     * @param $event_id
+     * @param $properties
+     * @return mixed
+     * @throws ThinkingDataException
+     */
     private function add($distinct_id, $account_id, $type, $event_name, $event_id, $properties)
     {
         $event = array();
         if (!is_null($event_name) && !is_string($event_name)) {
-            throw new ThinkingDataException("event name must be a str.");
+            throw new ThinkingDataException("event_name必须是一个字符串");
         }
         if (!$distinct_id && !$account_id) {
             throw new ThinkingDataException("account_id 和 distinct_id 不能同时为空");
@@ -176,14 +201,14 @@ class ThinkingDataAnalytics
             $event['#event_name'] = $event_name;
         }
         if ($type == 'track') {
-            $properties = array_merge($properties, $this->publicProperties);
+            $properties = $this->merge_public_properties($properties);
             if (array_key_exists('#first_check_id', $properties)) {
                 $event['#first_check_id'] = $properties['#first_check_id'];
                 unset($properties['#first_check_id']);
             }
         }
         if ($type == 'track_update' || $type == 'track_overwrite') {
-            $properties = array_merge($properties, $this->publicProperties);
+            $properties = $this->merge_public_properties($properties);
             $event['#event_id'] = $event_id;
         }
         $event['#type'] = $type;
@@ -217,7 +242,7 @@ class ThinkingDataAnalytics
         if (is_array($properties)) {
             $name_pattern = "/^(#|[a-z])[a-z0-9_]{0,49}$/i";
             if (!$properties) {
-                return;
+                return $properties;
             }
             foreach ($properties as $key => &$value) {
                 if (is_null($value)) {
@@ -244,12 +269,17 @@ class ThinkingDataAnalytics
                 }
                 //如果是数组
                 if (is_array($value)) {
-                    if (array_values($value) !== $value) {
-                        throw new ThinkingDataException("[array] property must not be associative. [key='$key']");
-                    }
-                    for ($i = 0; $i < count($value); $i++) {
-                        if ($value[$i] instanceof DateTime) {
-                            $value[$i] = $this->getFormatDate($value[$i]->getTimestamp());
+                    if (array_values($value) === $value) {
+                        for ($i = 0; $i < count($value); $i++) {
+                            if ($value[$i] instanceof DateTime) {
+                                $value[$i] = $this->getFormatDate($value[$i]->getTimestamp());
+                            }
+                        }
+                    } else {
+                        foreach ($value as $k => $v) {
+                            if ($v instanceof DateTime) {
+                                $value[$k] = $this->getFormatDate($v->getTimestamp());
+                            }
                         }
                     }
                 }
@@ -331,6 +361,16 @@ class ThinkingDataAnalytics
     public function register_public_properties($super_properties)
     {
         $this->publicProperties = array_merge($this->publicProperties, $super_properties);
+    }
+
+    public function merge_public_properties($properties)
+    {
+        foreach ($this->publicProperties as $key => $value) {
+            if (!isset($properties[$key])) {
+                $properties[$key] = $value;
+            }
+        }
+        return $properties;
     }
 
     /**
