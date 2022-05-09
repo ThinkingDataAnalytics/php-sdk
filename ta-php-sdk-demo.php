@@ -44,6 +44,15 @@ try {
     echo $e;
 }
 
+//动态公共事件属性
+function dynamicPublicProperties() {
+    $properties = array();
+    $properties['utc_time'] = date('Y-m-d h:i:s', time());
+    return $properties;
+}
+//设置动态公共事件属性
+$ta->register_dynamic_public_properties('dynamicPublicProperties');
+
 // 1. 用户匿名访问网站
 $account_id = 2121;
 $distinct_id = 'SJ232d233243'; // 用户未登录时，可以使用产品自己生成的cookieId等唯一标识符来标注用户
@@ -69,6 +78,31 @@ try {
     echo $e;
 }
 
+
+// 首次事件
+try {
+    $ta->track_first($distinct_id, $account_id, "track_first", "test_first_check_id", $properties);
+} catch (Exception $e) {
+    //handle except
+    echo $e;
+}
+
+// 可更新时间
+try {
+    $ta->track_update($distinct_id, $account_id, "track_update", "test_event_id", $properties);
+} catch (Exception $e) {
+    //handle except
+    echo $e;
+}
+
+// 可重写时间
+try {
+    $ta->track_overwrite($distinct_id, $account_id, "track_overwrite", "test_event_id", $properties);
+} catch (Exception $e) {
+    //handle except
+    echo $e;
+}
+
 //user_set 设置用户属性
 $properties = array();
 $properties['age1'] = 10;
@@ -84,10 +118,19 @@ try {
 
 //user_append 追加一个用户的某一个或者多个集合
 try {
-    //user_set 设置用户属性
     $properties = array();
     $properties['arrkey1'] = ['str3', 'str4'];//为集合类型追加多个值，key-array形式，array里面都是字符串类型
     $ta->user_append($distinct_id, $account_id, $properties);
+} catch (Exception $e) {
+    //handle except
+    echo $e;
+}
+
+//user_uniq_append 追加一个用户的某一个或者多个集合(对于重复元素进行去重处理)
+try {
+    $properties = array();
+    $properties['arrkey1'] = ['str4', 'str5'];//为集合类型追加多个值，key-array形式，array里面都是字符串类型
+    $ta->user_uniq_append($distinct_id, $account_id, $properties);
 } catch (Exception $e) {
     //handle except
     echo $e;

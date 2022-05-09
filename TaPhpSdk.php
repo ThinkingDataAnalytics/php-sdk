@@ -3,7 +3,7 @@
  * Date: 2018/8/2
  * Time: 17:14
  */
-define('SDK_VERSION', '1.8.0');
+define('SDK_VERSION', '2.0.0');
 
 /**
  * 数据格式错误异常
@@ -23,6 +23,7 @@ class ThinkingDataAnalytics
 {
     private $consumer;
     private $publicProperties;
+    private $dynamicPublicPropertiesCallback;
     private $enableUUID;
 
     function __construct($consumer, $enableUUID = false)
@@ -85,6 +86,19 @@ class ThinkingDataAnalytics
     }
 
     /**
+     * 追加一个用户的某一个或者多个集合(对于重复元素进行去重处理)
+     * @param string $distinct_id 访客 ID
+     * @param string $account_id 账户 ID
+     * @param array $properties key上传的是非关联数组
+     * @return boolean
+     * @throws Exception 数据传输，或者写文件失败
+     */
+    public function user_uniq_append($distinct_id, $account_id, $properties = array())
+    {
+        return $this->add($distinct_id, $account_id, 'user_uniq_append', null, null, $properties);
+    }
+
+    /**
      * 删除用户属性
      * @param string $distinct_id 访客 ID
      * @param string $account_id 账户 ID
@@ -128,6 +142,27 @@ class ThinkingDataAnalytics
             throw new ThinkingDataException("track方法event_name不能为空");
         }
         return $this->add($distinct_id, $account_id, 'track', $event_name, null, $properties);
+    }
+
+    /**
+     * 上报事件.
+     * @param string $distinct_id 访客 ID
+     * @param string $account_id 账户 ID
+     * @param string $event_name 事件名称
+     * @param string $first_check_id 首次事件ID
+     * @param array $properties 事件属性
+     * @return boolean
+     * @throws Exception 数据传输，或者写文件失败
+     */
+    public function track_first($distinct_id, $account_id, $event_name, $first_check_id, $properties = array())
+    {
+        if (!$event_name) {
+            throw new ThinkingDataException("track_first方法event_name不能为空");
+        }
+        if (!$first_check_id) {
+            throw new ThinkingDataException("track_first方法first_check_id不能为空");
+        }
+        return $this->add($distinct_id, $account_id, 'track_first', $event_name, $first_check_id, $properties);
     }
 
     /**
@@ -200,7 +235,12 @@ class ThinkingDataAnalytics
         if ($event_name) {
             $event['#event_name'] = $event_name;
         }
+        if ($type == 'track_first') {
+            $properties['#first_check_id'] = $event_id;
+            $type = 'track';
+        }
         if ($type == 'track') {
+            $properties = $this->merge_dynamic_public_properties($properties);
             $properties = $this->merge_public_properties($properties);
             if (array_key_exists('#first_check_id', $properties)) {
                 $event['#first_check_id'] = $properties['#first_check_id'];
@@ -208,6 +248,7 @@ class ThinkingDataAnalytics
             }
         }
         if ($type == 'track_update' || $type == 'track_overwrite') {
+            $properties = $this->merge_dynamic_public_properties($properties);
             $properties = $this->merge_public_properties($properties);
             $event['#event_id'] = $event_id;
         }
@@ -366,6 +407,32 @@ class ThinkingDataAnalytics
     public function merge_public_properties($properties)
     {
         foreach ($this->publicProperties as $key => $value) {
+            if (!isset($properties[$key])) {
+                $properties[$key] = $value;
+            }
+        }
+        return $properties;
+    }
+
+    /** 
+     * 设置每个事件都带有的一些动态公共属性
+     */
+    public function register_dynamic_public_properties($callback)
+    {
+        $this->dynamicPublicPropertiesCallback = $callback;
+    }
+
+    public function merge_dynamic_public_properties($properties)
+    {
+        $dynamicPublicProperties = array();
+        if ($this->dynamicPublicPropertiesCallback != null) {
+            try {
+                $dynamicPublicProperties = call_user_func($this->dynamicPublicPropertiesCallback);
+            } catch (Exception $e) {
+                echo $e;
+            }
+        }
+        foreach ($dynamicPublicProperties as $key => $value) {
             if (!isset($properties[$key])) {
                 $properties[$key] = $value;
             }
