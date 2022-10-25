@@ -10,7 +10,7 @@
 ```json
 {
   "require": {
-    "thinkinggame/ta-php-sdk": "v2.0.0"
+    "thinkinggame/ta-php-sdk": "v2.1.0"
   }
 }
 ```
@@ -47,6 +47,12 @@ $server_url = 'https://数据采集地址';
 
 ```php
 $ta = new ThinkingDataAnalytics(new DebugConsumer("SERVER_URL","APP_ID"));
+```
+
+#### 3. 控制台日志打印
+默认 DebugConsumer 模式开启了控制台日志打印，方便调试。您也可以手动控制日志打印的开关：
+```php
+TALogger::$enable = true; // 开启控制台日志打印
 ```
 
 ### 使用示例
