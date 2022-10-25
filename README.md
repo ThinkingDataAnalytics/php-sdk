@@ -18,7 +18,7 @@
 #### 2. 初始化SDK
 
 ```php
-require "TaPhpSdk.php";
+require "vendor/thinkinggame/ta-php-sdk/src/TaPhpSdk.php";
 ```
 
 在引入SDK 后，您需要创建 SDK 实例，可以通过三种方法创建 SDK 实例，只需选择其中一种即可：
