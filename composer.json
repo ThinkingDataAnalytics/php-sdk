@@ -22,7 +22,7 @@
   },
   "autoload": {
     "files": [
-      "TaPhpSdk.php"
+      "ta-php-sdk/TaPhpSdk.php"
     ]
   },
   "minimum-stability": "stable"
