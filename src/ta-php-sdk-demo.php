@@ -38,8 +38,10 @@ date_default_timezone_set("Asia/Shanghai");
 //三、使用DebugConsumer 用于查看数据格式是否正确，一条一条的发送，禁止线上环境使用！！！
 //DebugConsumer初始化
 try {
-    //$debugConsumer = new DebugConsumer("http://localhost:8091", $appid = "appid", false);
-    $ta = new ThinkingDataAnalytics(new FileConsumer(".", 0, true, 'a'));
+    $debugConsumer = new DebugConsumer("serverUrl", $appid = "appId", 1000, "123456789");
+//    $fileConsumer = new FileConsumer(".", 0, true, 'a');
+
+    $ta = new ThinkingDataAnalytics($debugConsumer);
 } catch (ThinkingDataException $e) {
     echo $e;
 }

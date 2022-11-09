@@ -3,7 +3,7 @@
  * Date: 2018/8/2
  * Time: 17:14
  */
-const SDK_VERSION = '2.1.0';
+const SDK_VERSION = '2.1.1';
 
 /**
  * 数据格式错误异常
@@ -809,6 +809,7 @@ class DebugConsumer extends AbstractConsumer
     private $appid;
     private $requestTimeout;
     private $writerData = true;
+    private $deviceId;
 
     /**
      * 创建给定配置的 DebugConsumer 对象
@@ -817,7 +818,7 @@ class DebugConsumer extends AbstractConsumer
      * @param int $request_timeout http 的 timeout，默认 1000s
      * @throws ThinkingDataException
      */
-    function __construct($server_url, $appid, $request_timeout = 1000)
+    function __construct($server_url, $appid, $request_timeout = 1000, $deviceId = null)
     {
         $parsed_url = parse_url($server_url);
         if ($parsed_url === false) {
@@ -831,6 +832,7 @@ class DebugConsumer extends AbstractConsumer
         $this->appid = $appid;
         $this->requestTimeout = $request_timeout;
         $this->strict = true;
+        $this->deviceId = $deviceId;
         TALogger::$enable = true;
     }
 
@@ -855,6 +857,10 @@ class DebugConsumer extends AbstractConsumer
         $ch = curl_init($this->url);
         $dryRun = $this->writerData ? 0 : 1;
         $data = "source=server&appid=" . $this->appid . "&dryRun=" . $dryRun . "&data=" . urlencode($message);
+
+        if (is_string($this->deviceId) && strlen($this->deviceId) > 0) {
+            $data = $data . "&deviceId=" . $this->deviceId;
+        }
 
         //参数设置
         curl_setopt($ch, CURLOPT_POST, 1);
