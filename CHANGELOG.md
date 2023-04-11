@@ -1,3 +1,10 @@
+### v2.2.1
+**Date:** 2023/04/11
+
+**Notes:**
+
+* Close file handler when SDK close
+
 ### v2.2.0
 **Date:** 2023/04/10
 
