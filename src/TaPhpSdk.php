@@ -3,7 +3,7 @@ namespace ThinkingEngine;
 use DateTime;
 use Exception;
 
-const SDK_VERSION = '2.2.1';
+const SDK_VERSION = '2.2.2';
 const SDK_LIB_NAME = 'tga_php_sdk';
 const TRACK_TYPE_NORMAL = 'track';
 const TRACK_TYPE_FIRST = 'track_first';
@@ -589,7 +589,7 @@ class FileConsumer extends AbstractConsumer
     {
         $file_name = $this->getFileName();
         if ($this->fileHandler != null && $this->fileName != $file_name) {
-            $this->close();
+            fclose($this->fileHandler);
             $this->fileName = $file_name;
             $this->fileHandler = null;
         }

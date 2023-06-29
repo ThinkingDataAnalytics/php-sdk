@@ -1,3 +1,10 @@
+### v2.2.2
+**Date:** 2023/06/29
+
+**Notes:**
+
+* bugfix: close file handler when file rotate
+
 ### v2.2.1
 **Date:** 2023/04/11
 
