@@ -664,11 +664,11 @@ class BatchConsumer extends AbstractConsumer
      * @param string $appid APP ID
      * @param int $max_size flush event count each time
      * @param int $retryTimes : retry times, default 3
-     * @param int $request_timeout : http timeout, default 1000s
+     * @param int $request_timeout : http timeout, default 5s
      * @param int $cache_capacity : Multiple of $max_size, It determines the cache size
      * @throws ThinkingDataException
      */
-    function __construct($server_url, $appid, $max_size = 20, $retryTimes = 3, $request_timeout = 1000, $cache_capacity = 50)
+    function __construct($server_url, $appid, $max_size = 20, $retryTimes = 3, $request_timeout = 5, $cache_capacity = 50)
     {
         $this->buffers = array();
         $this->appid = $appid;
@@ -799,7 +799,7 @@ class BatchConsumer extends AbstractConsumer
 
         curl_setopt($ch, CURLOPT_POST, 1);
         curl_setopt($ch, CURLOPT_HEADER, 0);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 6000);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_TIMEOUT, $this->requestTimeout);
 
@@ -872,10 +872,10 @@ class DebugConsumer extends AbstractConsumer
      * init DebugConsumer
      * @param string $server_url server url
      * @param string $appid APP ID
-     * @param int $request_timeout http timeout, default 1000s
+     * @param int $request_timeout http timeout, default 5s
      * @throws ThinkingDataException
      */
-    function __construct($server_url, $appid, $request_timeout = 1000, $deviceId = null)
+    function __construct($server_url, $appid, $request_timeout = 5, $deviceId = null)
     {
         $parsed_url = parse_url($server_url);
         if ($parsed_url === false) {
@@ -929,7 +929,7 @@ class DebugConsumer extends AbstractConsumer
 
         curl_setopt($ch, CURLOPT_POST, 1);
         curl_setopt($ch, CURLOPT_HEADER, 0);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 6000);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_TIMEOUT, $this->requestTimeout);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
