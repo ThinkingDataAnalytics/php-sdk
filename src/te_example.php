@@ -5,46 +5,46 @@ namespace TESDKDemo;
 require_once "vendor/autoload.php";
 
 use Exception;
-use ThinkingEngine\ThinkingDataAnalytics;
-use ThinkingEngine\FileConsumer;
-use ThinkingEngine\TALogger;
-use ThinkingEngine\DebugConsumer;
-use ThinkingEngine\BatchConsumer;
-use ThinkingEngine\ThinkingDataException;
+use ThinkingData\TDLog;
+use ThinkingData\TDAnalytics;
+use ThinkingData\TDFileConsumer;
+use ThinkingData\TDDebugConsumer;
+use ThinkingData\TDBatchConsumer;
+use ThinkingData\ThinkingDataException;
 
 date_default_timezone_set("Asia/Shanghai");
 
 /**
  * write to file, it works with LogBus
- * @return ThinkingDataAnalytics
+ * @return TDAnalytics
  */
 function get_file_sdk()
 {
-    $consumer = new FileConsumer("H:/log", 200, true, "te");
-    TALogger::$enable = false;
-    return new ThinkingDataAnalytics($consumer, true);
+    TDLog::$enable = true;
+    $consumer = new TDFileConsumer("./log", 200, true, "te");
+    return new TDAnalytics($consumer, true);
 }
 
 /**
  * report data by http
- * @return ThinkingDataAnalytics|null
+ * @return TDAnalytics|null
  */
 function get_batch_sdk()
 {
-    $batchConsumer = new BatchConsumer("url", "appid");
-    TALogger::$enable = false;
-    return new ThinkingDataAnalytics($batchConsumer);
+    TDLog::$enable = true;
+    $batchConsumer = new TDBatchConsumer("https://receiver-ta-demo.thinkingdata.cn/", "appid");
+    return new TDAnalytics($batchConsumer);
 }
 
 /**
- * @return ThinkingDataAnalytics|null
+ * @return TDAnalytics|null
  */
 function get_debug_sdk()
 {
     try {
-        $debugConsumer = new DebugConsumer("serverUrl", "appId", 1000, "123456789");
-        TALogger::$enable = true;
-        return new ThinkingDataAnalytics($debugConsumer, true);
+        TDLog::$enable = true;
+        $debugConsumer = new TDDebugConsumer("https://receiver-ta-demo.thinkingdata.cn/", "appId", 1000, "123456789");
+        return new TDAnalytics($debugConsumer, true);
     } catch (ThinkingDataException $e) {
         echo $e;
         return null;

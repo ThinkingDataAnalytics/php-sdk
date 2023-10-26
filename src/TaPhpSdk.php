@@ -1,9 +1,9 @@
 <?php
-namespace ThinkingEngine;
+namespace ThinkingData;
 use DateTime;
 use Exception;
 
-const SDK_VERSION = '2.2.2';
+const SDK_VERSION = '3.0.0';
 const SDK_LIB_NAME = 'tga_php_sdk';
 const TRACK_TYPE_NORMAL = 'track';
 const TRACK_TYPE_FIRST = 'track_first';
@@ -19,36 +19,46 @@ const USER_TYPE_DEL = 'user_del';
 const NAME_PATTERN = "/^(#|[a-z])[a-z0-9_]{0,49}$/i";
 
 /**
- * date exception
+ * Exception
  */
-class ThinkingDataException extends Exception
-{
-    
-}
+class ThinkingDataException extends Exception {}
 
 /**
- * network exception
+ * Network exception
  */
-class ThinkingDataNetWorkException extends Exception
-{
-}
+class ThinkingDataNetWorkException extends Exception {}
 
-class ThinkingDataAnalytics
+/**
+ * [Deprecated class]
+ * @deprecated please use TDAnalytics
+ */
+class ThinkingDataAnalytics extends TDAnalytics {}
+
+/**
+ * Entry of SDK
+ */
+class TDAnalytics
 {
     private $consumer;
     private $publicProperties;
     private $dynamicPublicPropertiesCallback;
     private $enableUUID;
 
+    /**
+     * Construct
+     * @param TDAbstractConsumer $consumer
+     * @param bool $enableUUID
+     */
     function __construct($consumer, $enableUUID = false)
     {
+        TDLog::log("SDK init success");
         $this->consumer = $consumer;
         $this->enableUUID = $enableUUID;
         $this->clear_public_properties();
     }
 
     /**
-     * set user properties. would overwrite existing names
+     * Set user properties. would overwrite existing names
      * @param string $distinct_id distinct ID
      * @param string $account_id account ID
      * @param array $properties properties
@@ -61,7 +71,7 @@ class ThinkingDataAnalytics
     }
 
     /**
-     * set user properties, If such property had been set before, this message would be neglected.
+     * Set user properties, If such property had been set before, this message would be neglected.
      * @param string $distinct_id distinct ID
      * @param string $account_id account ID
      * @param array $properties properties
@@ -74,7 +84,7 @@ class ThinkingDataAnalytics
     }
 
     /**
-     * to accumulate operations against the property
+     * To accumulate operations against the property
      * @param string $distinct_id distinct ID
      * @param string $account_id account ID
      * @param array $properties properties
@@ -87,7 +97,7 @@ class ThinkingDataAnalytics
     }
 
     /**
-     * to add user properties of array type
+     * To add user properties of array type
      * @param string $distinct_id distinct ID
      * @param string $account_id account ID
      * @param array $properties properties
@@ -100,7 +110,7 @@ class ThinkingDataAnalytics
     }
 
     /**
-     * append user properties to array type by unique.
+     * Append user properties to array type by unique.
      * @param string $distinct_id distinct ID
      * @param string $account_id account ID
      * @param array $properties properties
@@ -113,7 +123,7 @@ class ThinkingDataAnalytics
     }
 
     /**
-     * clear the user properties of users
+     * Clear the user properties of users
      * @param string $distinct_id distinct ID
      * @param string $account_id account ID
      * @param array $properties properties
@@ -130,12 +140,12 @@ class ThinkingDataAnalytics
     }
 
     /**
-     * delete a user, This operation cannot be undone
+     * Delete a user, This operation cannot be undone
      * @param $distinct_id
      * @param $account_id
      * @param $properties
      * @return mixed
-     * @throws ThinkingDataException
+     * @throws Exception exception
      */
     public function user_del($distinct_id, $account_id, $properties = array())
     {
@@ -143,7 +153,7 @@ class ThinkingDataAnalytics
     }
 
     /**
-     * report ordinary event
+     * Report ordinary event
      * @param string $distinct_id distinct ID
      * @param string $account_id account ID
      * @param string $event_name event name
@@ -158,7 +168,7 @@ class ThinkingDataAnalytics
     }
 
     /**
-     * report first event.
+     * Report first event.
      * @param string $distinct_id distinct ID
      * @param string $account_id account ID
      * @param string $event_name event name
@@ -175,7 +185,7 @@ class ThinkingDataAnalytics
     }
 
     /**
-     * report updatable event
+     * Report updatable event
      * @param string $distinct_id distinct ID
      * @param string $account_id account ID
      * @param string $event_name event name
@@ -192,14 +202,14 @@ class ThinkingDataAnalytics
     }
 
     /**
-     * report overwrite event.
+     * Report overwrite event.
      * @param $distinct_id string
      * @param $account_id string
      * @param $event_name string
      * @param $event_id string
      * @param $properties array
      * @return mixed
-     * @throws ThinkingDataException
+     * @throws Exception exception
      */
     public function track_overwrite($distinct_id, $account_id, $event_name, $event_id, $properties = array())
     {
@@ -209,7 +219,8 @@ class ThinkingDataAnalytics
     }
 
     /**
-     * @throws ThinkingDataException
+     * Check event name
+     * @throws Exception exception
      */
     private function checkEventName($eventName) {
         if ($this->isStrict() && (!is_string($eventName) || empty($eventName))) {
@@ -218,15 +229,17 @@ class ThinkingDataAnalytics
     }
 
     /**
-     * @throws ThinkingDataException
+     * Check event id
+     * @throws Exception exception
      */
     private function checkEventId($eventId) {
         if ($this->isStrict() && empty($eventId)) {
             throw new ThinkingDataException("event id is not be empty");
         }
     }
+
     /**
-     * @throws ThinkingDataException
+     * @throws Exception exception
      */
     private function checkAccountIdAndDistinctId($accountId, $distinctId) {
         if ($this->isStrict() && empty($accountId) && empty($distinctId)) {
@@ -242,7 +255,7 @@ class ThinkingDataAnalytics
      * @param $event_id string
      * @param $properties array
      * @return mixed
-     * @throws ThinkingDataException
+     * @throws Exception exception
      */
     private function add($distinct_id, $account_id, $type, $event_name, $event_id, $properties)
     {
@@ -292,7 +305,7 @@ class ThinkingDataAnalytics
     }
 
     /**
-     * @throws ThinkingDataException
+     * @throws Exception exception
      */
     private function assertProperties($type, $properties)
     {
@@ -447,7 +460,7 @@ class ThinkingDataAnalytics
         if (!empty($callback) && function_exists($callback)) {
             $this->dynamicPublicPropertiesCallback = $callback;
         } else {
-            TALogger::log("dynamic common properties function is error");
+            TDLog::log("dynamic common properties function is error");
         }
     }
 
@@ -482,6 +495,7 @@ class ThinkingDataAnalytics
     public function close()
     {
         $this->consumer->close();
+        TDLog::log("SDK close");
     }
 
     /**
@@ -492,7 +506,10 @@ class ThinkingDataAnalytics
     }
 }
 
-abstract class AbstractConsumer
+/**
+ * Abstract consumer
+ */
+abstract class TDAbstractConsumer
 {
     /**
      * @var bool $strict check properties or not
@@ -500,6 +517,11 @@ abstract class AbstractConsumer
      * false: upload data anyway
      */
     protected $strict = false;
+
+    /**
+     * Get strict status
+     * @return bool
+     */
     public function getStrictStatus() {
         return $this->strict;
     }
@@ -528,9 +550,16 @@ abstract class AbstractConsumer
 }
 
 /**
- * write data to file, it works with LogBus. not support multiple thread
+ * [Deprecated class]
+ * @deprecated please use TDFileConsumer
  */
-class FileConsumer extends AbstractConsumer
+class FileConsumer extends TDFileConsumer {}
+
+
+/**
+ * Write data to file, it works with LogBus. not support multiple thread
+ */
+class TDFileConsumer extends TDAbstractConsumer
 {
     private $fileHandler;
     private $fileName;
@@ -551,6 +580,7 @@ class FileConsumer extends AbstractConsumer
      */
     function __construct($file_directory = '.', $file_size = 0, $rotate_hourly = false, $file_prefix = '', $bufferSize = 100)
     {
+        TDLog::log("File consumer init success. Log_directory:" . $file_directory);
         $this->fileDirectory = $file_directory;
         if (!is_dir($file_directory)) {
             mkdir($file_directory, 0777, true);
@@ -562,7 +592,7 @@ class FileConsumer extends AbstractConsumer
         $this->strict = false;
         $this->buffers = array();
         $this->bufferSize = $bufferSize;
-        TALogger::$enable = false;
+        TDLog::$enable = false;
     }
 
     /**
@@ -574,10 +604,9 @@ class FileConsumer extends AbstractConsumer
     {
         $this->buffers[] = $message . "\n";
         if (count($this->buffers) >= $this->bufferSize) {
-            TALogger::log("flush buffer data");
             return $this->flush();
         } else {
-            TALogger::log("add to buffer: $message");
+            TDLog::log("Enqueue data: $message");
             return true;
         }
     }
@@ -597,6 +626,8 @@ class FileConsumer extends AbstractConsumer
             $this->fileHandler = fopen($file_name, 'a+');
         }
         if (flock($this->fileHandler, LOCK_EX)) {
+            $flush_cont = count($this->buffers);
+            TDLog::log("Flush data, count: $flush_cont");
             $result = fwrite($this->fileHandler, join("", $this->buffers));
             flock($this->fileHandler, LOCK_UN);
             $this->buffers = array();
@@ -608,6 +639,7 @@ class FileConsumer extends AbstractConsumer
     public function close()
     {
         $this->flush();
+        TDLog::log("File consumer close");
         if ($this->fileHandler === null) {
             return false;
         }
@@ -643,9 +675,15 @@ class FileConsumer extends AbstractConsumer
 }
 
 /**
+ * [Deprecated class]
+ * @deprecated please use TDBatchConsumer
+ */
+class BatchConsumer extends TDBatchConsumer {}
+
+/**
  * upload data to TE by http. not support multiple thread
  */
-class BatchConsumer extends AbstractConsumer
+class TDBatchConsumer extends TDAbstractConsumer
 {
     private $url;
     private $appid;
@@ -664,12 +702,14 @@ class BatchConsumer extends AbstractConsumer
      * @param string $appid APP ID
      * @param int $max_size flush event count each time
      * @param int $retryTimes : retry times, default 3
-     * @param int $request_timeout : http timeout, default 1000s
+     * @param int $request_timeout : http timeout, default 5s
      * @param int $cache_capacity : Multiple of $max_size, It determines the cache size
      * @throws ThinkingDataException
      */
-    function __construct($server_url, $appid, $max_size = 20, $retryTimes = 3, $request_timeout = 1000, $cache_capacity = 50)
+    function __construct($server_url, $appid, $max_size = 20, $retryTimes = 3, $request_timeout = 5, $cache_capacity = 50)
     {
+        TDLog::log("Batch consumer init success. AppId:" . $appid . ", receiverUrl:" . $server_url);
+
         $this->buffers = array();
         $this->appid = $appid;
         $this->maxSize = $max_size;
@@ -685,7 +725,6 @@ class BatchConsumer extends AbstractConsumer
             . ((isset($parsed_url['port'])) ? ':' . $parsed_url['port'] : '')
             . '/sync_server';
         $this->strict = false;
-        TALogger::$enable = false;
     }
 
     /**
@@ -696,7 +735,7 @@ class BatchConsumer extends AbstractConsumer
     {
         $this->flush();
     }
-    
+
     /**
      * @param $message
      * @return bool|null
@@ -707,15 +746,16 @@ class BatchConsumer extends AbstractConsumer
     {
         $this->buffers[] = $message;
         if (count($this->buffers) >= $this->maxSize) {
-            TALogger::log("flush buffer data");
             return $this->flush();
         } else {
-            TALogger::log("add to buffer: $message");
+            TDLog::log("Enqueue data: $message");
             return null;
         }
     }
 
     /**
+     * Flush data
+     *
      * @param $flag
      * @return bool
      * @throws ThinkingDataException
@@ -723,6 +763,7 @@ class BatchConsumer extends AbstractConsumer
      */
     public function flush($flag = false)
     {
+        TDLog::log("Flush data");
         if (empty($this->buffers) && empty($this->cacheBuffers)) {
             return true;
         }
@@ -763,12 +804,15 @@ class BatchConsumer extends AbstractConsumer
     }
 
     /**
+     * Close consumer
+     *
      * @throws ThinkingDataNetWorkException
      * @throws ThinkingDataException
      */
     public function close()
     {
         $this->flush(true);
+        TDLog::log("Batch consumer close");
     }
 
     public function setCompress($compress = true)
@@ -793,13 +837,13 @@ class BatchConsumer extends AbstractConsumer
     private function doRequest($message_array)
     {
         $consoleMessages = implode(PHP_EOL, $message_array);
-        TALogger::log("send request: [\n$consoleMessages\n]");
+        TDLog::log("Send data, request: [\n$consoleMessages\n]");
 
         $ch = curl_init($this->url);
 
         curl_setopt($ch, CURLOPT_POST, 1);
         curl_setopt($ch, CURLOPT_HEADER, 0);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 6000);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 6);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_TIMEOUT, $this->requestTimeout);
 
@@ -825,7 +869,7 @@ class BatchConsumer extends AbstractConsumer
         $curreyRetryTimes = 0;
         while ($curreyRetryTimes++ < $this->retryTimes) {
             $result = curl_exec($ch);
-            TALogger::log("return: $result");
+            TDLog::log("Send data, response: $result");
 
             if (!$result) {
                 echo new ThinkingDataNetWorkException("Cannot post message to server , error --> " . curl_error(($ch)));
@@ -858,9 +902,16 @@ class BatchConsumer extends AbstractConsumer
 }
 
 /**
+ * [Deprecated class]
+ * @deprecated please use TDDebugConsumer
+ */
+class DebugConsumer extends TDDebugConsumer {}
+
+
+/**
  * The data is reported one by one, and when an error occurs, the exception will be thrown
  */
-class DebugConsumer extends AbstractConsumer
+class TDDebugConsumer extends TDAbstractConsumer
 {
     private $url;
     private $appid;
@@ -872,11 +923,13 @@ class DebugConsumer extends AbstractConsumer
      * init DebugConsumer
      * @param string $server_url server url
      * @param string $appid APP ID
-     * @param int $request_timeout http timeout, default 1000s
+     * @param int $request_timeout http timeout, default 5s
      * @throws ThinkingDataException
      */
-    function __construct($server_url, $appid, $request_timeout = 1000, $deviceId = null)
+    function __construct($server_url, $appid, $request_timeout = 5, $deviceId = null)
     {
+        TDLog::log("Debug consumer init success. AppId:" . $appid . ", receiverUrl:" . $server_url);
+
         $parsed_url = parse_url($server_url);
         if ($parsed_url === false) {
             throw new ThinkingDataException("Invalid server url");
@@ -890,7 +943,6 @@ class DebugConsumer extends AbstractConsumer
         $this->requestTimeout = $request_timeout;
         $this->strict = true;
         $this->deviceId = $deviceId;
-        TALogger::$enable = true;
     }
 
     /**
@@ -917,7 +969,7 @@ class DebugConsumer extends AbstractConsumer
      */
     private function doRequest($message)
     {
-        TALogger::log("send request: $message");
+        TDLog::log("Send data, request: $message");
 
         $ch = curl_init($this->url);
         $dryRun = $this->writerData ? 0 : 1;
@@ -929,7 +981,7 @@ class DebugConsumer extends AbstractConsumer
 
         curl_setopt($ch, CURLOPT_POST, 1);
         curl_setopt($ch, CURLOPT_HEADER, 0);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 6000);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 6);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_TIMEOUT, $this->requestTimeout);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
@@ -943,7 +995,7 @@ class DebugConsumer extends AbstractConsumer
 
         $result = curl_exec($ch);
 
-        TALogger::log("return: $result");
+        TDLog::log("Send data, response: $result");
 
         if (!$result) {
             throw new ThinkingDataNetWorkException("Cannot post message to server , error -->" . curl_error(($ch)));
@@ -959,7 +1011,7 @@ class DebugConsumer extends AbstractConsumer
             if ($json['errorLevel'] == 0) {
                 return true;
             } else {
-                TALogger::log("\nUnexpected Return Code " . $json['errorLevel'] . " for: " . $message . "\n");
+                TDLog::log("Unexpected Return Code:" . $json['errorLevel'] . " for: " . $message);
                 throw new ThinkingDataException(print_r($json, true));
             }
         } else {
@@ -968,13 +1020,22 @@ class DebugConsumer extends AbstractConsumer
     }
 }
 
-class TALogger {
+/**
+ * [Deprecated class]
+ * @deprecated please use TDLog
+ */
+class TALogger extends TDLog {}
+
+/**
+ * Log module
+ */
+class TDLog {
     static $enable = false;
     static function log() {
         if (self::$enable) {
             $params = implode("", func_get_args());
             $time = date("Y-m-d H:i:s", time());
-            echo "[ThinkingAnalytics][$time]: ", $params, PHP_EOL;
+            echo "[ThinkingData][$time]: ", $params, PHP_EOL;
         }
     }
 }

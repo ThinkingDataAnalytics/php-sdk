@@ -10,8 +10,8 @@
   "license": "MIT",
   "authors": [
     {
-      "name": "shushu",
-      "email": "sunzeyu@thinkingdata.cn"
+      "name": "ThinkingData",
+      "email": "sdk@thinkingdata.cn"
     }
   ],
   "require": {
