@@ -3,7 +3,7 @@ namespace ThinkingData;
 use DateTime;
 use Exception;
 
-const SDK_VERSION = '3.0.0';
+const SDK_VERSION = '3.1.0';
 const SDK_LIB_NAME = 'tga_php_sdk';
 const TRACK_TYPE_NORMAL = 'track';
 const TRACK_TYPE_FIRST = 'track_first';
@@ -17,6 +17,7 @@ const USER_TYPE_UNIQUE_APPEND = 'user_uniq_append';
 const USER_TYPE_ADD = 'user_add';
 const USER_TYPE_DEL = 'user_del';
 const NAME_PATTERN = "/^(#|[a-z])[a-z0-9_]{0,49}$/i";
+const TD_LOG_FILE_DEFAULT_PERMISSION = 0644;
 
 /**
  * Exception
@@ -569,6 +570,7 @@ class TDFileConsumer extends TDAbstractConsumer
     private $rotateHourly;
     private $buffers;
     private $bufferSize;
+    private $permission;
 
     /**
      * init FileConsumer
@@ -592,7 +594,16 @@ class TDFileConsumer extends TDAbstractConsumer
         $this->strict = false;
         $this->buffers = array();
         $this->bufferSize = $bufferSize;
+        $this->permission = TD_LOG_FILE_DEFAULT_PERMISSION;
         TDLog::$enable = false;
+    }
+
+    public function setLogFilePermission($permission)
+    {
+        if (!($permission == 0664 || $permission == 0666)) {
+            $permission = TD_LOG_FILE_DEFAULT_PERMISSION;
+        }
+        $this->permission = $permission;
     }
 
     /**
@@ -624,6 +635,7 @@ class TDFileConsumer extends TDAbstractConsumer
         }
         if ($this->fileHandler === null) {
             $this->fileHandler = fopen($file_name, 'a+');
+            chmod($file_name, $this->permission);
         }
         if (flock($this->fileHandler, LOCK_EX)) {
             $flush_cont = count($this->buffers);

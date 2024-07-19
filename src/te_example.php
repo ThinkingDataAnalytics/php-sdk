@@ -20,8 +20,8 @@ date_default_timezone_set("Asia/Shanghai");
  */
 function get_file_sdk()
 {
-    TDLog::$enable = true;
     $consumer = new TDFileConsumer("./log", 200, true, "te");
+    TDLog::$enable = true;
     return new TDAnalytics($consumer, true);
 }
 

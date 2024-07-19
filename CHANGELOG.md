@@ -1,3 +1,10 @@
+### v3.1.0
+**Date:** 2024/07/19
+
+**Notes:**
+
+* Supports user-defined permissions
+
 ### v3.0.0
 **Date:** 2023/10/08
 
