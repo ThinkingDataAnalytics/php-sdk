@@ -1,3 +1,10 @@
+### v3.1.1
+**Date:** 2024/07/24
+
+**Notes:**
+
+* More permissions are supported
+
 ### v3.1.0
 **Date:** 2024/07/19
 

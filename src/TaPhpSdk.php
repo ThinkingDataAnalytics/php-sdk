@@ -3,7 +3,7 @@ namespace ThinkingData;
 use DateTime;
 use Exception;
 
-const SDK_VERSION = '3.1.0';
+const SDK_VERSION = '3.1.1';
 const SDK_LIB_NAME = 'tga_php_sdk';
 const TRACK_TYPE_NORMAL = 'track';
 const TRACK_TYPE_FIRST = 'track_first';
@@ -600,7 +600,7 @@ class TDFileConsumer extends TDAbstractConsumer
 
     public function setLogFilePermission($permission)
     {
-        if (!($permission == 0664 || $permission == 0666)) {
+        if ($permission < TD_LOG_FILE_DEFAULT_PERMISSION) {
             $permission = TD_LOG_FILE_DEFAULT_PERMISSION;
         }
         $this->permission = $permission;
@@ -634,8 +634,12 @@ class TDFileConsumer extends TDAbstractConsumer
             $this->fileHandler = null;
         }
         if ($this->fileHandler === null) {
-            $this->fileHandler = fopen($file_name, 'a+');
-            chmod($file_name, $this->permission);
+            if (file_exists($file_name)) {
+                $this->fileHandler = fopen($file_name, 'a+');
+            } else {
+                $this->fileHandler = fopen($file_name, 'a+');
+                chmod($file_name, $this->permission);
+            }
         }
         if (flock($this->fileHandler, LOCK_EX)) {
             $flush_cont = count($this->buffers);
