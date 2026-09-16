@@ -3,7 +3,7 @@ namespace ThinkingData;
 use DateTime;
 use Exception;
 
-const SDK_VERSION = '3.1.1';
+const SDK_VERSION = '3.1.2';
 const SDK_LIB_NAME = 'tga_php_sdk';
 const TRACK_TYPE_NORMAL = 'track';
 const TRACK_TYPE_FIRST = 'track_first';
@@ -484,19 +484,22 @@ class TDAnalytics
 
     /**
      * report data immediately
+     * @return bool
      */
     public function flush()
     {
-        $this->consumer->flush();
+        return $this->consumer->flush();
     }
 
     /**
      * close and exit sdk
+     * @return bool
      */
     public function close()
     {
-        $this->consumer->close();
+        $result = $this->consumer->close();
         TDLog::log("SDK close");
+        return $result;
     }
 
     /**
@@ -570,6 +573,10 @@ class TDFileConsumer extends TDAbstractConsumer
     private $rotateHourly;
     private $buffers;
     private $bufferSize;
+    private $maxBufferSize;
+    private $pendingData;
+    private $pendingCount;
+    private $pendingFileName;
     private $permission;
 
     /**
@@ -579,8 +586,10 @@ class TDFileConsumer extends TDAbstractConsumer
      * @param int $file_size max size of single log file (MByte)
      * @param bool $rotate_hourly rotate by hour or not
      * @param string $file_prefix prefix of file
+     * @param int $bufferSize flush event count
+     * @param int $maxBufferSize max pending event count, defaults to 10 times bufferSize
      */
-    function __construct($file_directory = '.', $file_size = 0, $rotate_hourly = false, $file_prefix = '', $bufferSize = 100)
+    function __construct($file_directory = '.', $file_size = 0, $rotate_hourly = false, $file_prefix = '', $bufferSize = 100, $maxBufferSize = 0)
     {
         TDLog::log("File consumer init success. Log_directory:" . $file_directory);
         $this->fileDirectory = $file_directory;
@@ -593,7 +602,13 @@ class TDFileConsumer extends TDAbstractConsumer
         $this->fileName = $this->getFileName();
         $this->strict = false;
         $this->buffers = array();
-        $this->bufferSize = $bufferSize;
+        $this->bufferSize = max(1, (int)$bufferSize);
+        $this->maxBufferSize = (int)$maxBufferSize > 0
+            ? max($this->bufferSize, (int)$maxBufferSize)
+            : $this->bufferSize * 10;
+        $this->pendingData = '';
+        $this->pendingCount = 0;
+        $this->pendingFileName = null;
         $this->permission = TD_LOG_FILE_DEFAULT_PERMISSION;
         TDLog::$enable = false;
     }
@@ -609,12 +624,18 @@ class TDFileConsumer extends TDAbstractConsumer
     /**
      * write data
      * @param $message
-     * @return bool|int
+     * @return bool
      */
     public function send($message)
     {
+        if ($this->getPendingCount() >= $this->maxBufferSize) {
+            if (!$this->flush() && $this->getPendingCount() >= $this->maxBufferSize) {
+                TDLog::log("File consumer buffer is full, reject new data");
+                return false;
+            }
+        }
         $this->buffers[] = $message . "\n";
-        if (count($this->buffers) >= $this->bufferSize) {
+        if ($this->getPendingCount() >= $this->bufferSize) {
             return $this->flush();
         } else {
             TDLog::log("Enqueue data: $message");
@@ -623,43 +644,126 @@ class TDFileConsumer extends TDAbstractConsumer
     }
 
     /**
-     * @return bool|int
+     * The buffer is kept when the write fails, so that the next flush can retry.
+     * @return bool
      */
     public function flush()
     {
-        $file_name = $this->getFileName();
-        if ($this->fileHandler != null && $this->fileName != $file_name) {
+        while ($this->pendingData !== '' || !empty($this->buffers)) {
+            if ($this->pendingData === '') {
+                $this->pendingData = join("", $this->buffers);
+                $this->pendingCount = count($this->buffers);
+                $this->buffers = array();
+                $this->pendingFileName = $this->getFileName();
+            }
+            if (!$this->flushPendingData()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private function flushPendingData()
+    {
+        $flush_cont = $this->pendingCount;
+        $file_name = $this->pendingFileName;
+        if ($this->fileHandler !== null &&
+            ($this->fileName != $file_name || !$this->isFileHandlerCurrent($file_name))) {
             fclose($this->fileHandler);
             $this->fileName = $file_name;
             $this->fileHandler = null;
         }
         if ($this->fileHandler === null) {
-            if (file_exists($file_name)) {
-                $this->fileHandler = fopen($file_name, 'a+');
-            } else {
-                $this->fileHandler = fopen($file_name, 'a+');
+            $file_exists = file_exists($file_name);
+            $file_handler = fopen($file_name, 'a+');
+            if ($file_handler === false) {
+                TDLog::log("Open log file failed: $file_name, keep $flush_cont records in buffer");
+                return false;
+            }
+            $this->fileHandler = $file_handler;
+            $this->fileName = $file_name;
+            if (!$file_exists) {
                 chmod($file_name, $this->permission);
             }
         }
-        if (flock($this->fileHandler, LOCK_EX)) {
-            $flush_cont = count($this->buffers);
-            TDLog::log("Flush data, count: $flush_cont");
-            $result = fwrite($this->fileHandler, join("", $this->buffers));
-            flock($this->fileHandler, LOCK_UN);
-            $this->buffers = array();
-            return $result;
+        if (!flock($this->fileHandler, LOCK_EX)) {
+            TDLog::log("Lock log file failed: $file_name, keep $flush_cont records in buffer");
+            return false;
+        }
+        TDLog::log("Flush data, count: $flush_cont");
+        $data = $this->pendingData;
+        $data_length = strlen($data);
+        $written_total = 0;
+        while ($written_total < $data_length) {
+            $result = fwrite($this->fileHandler, substr($data, $written_total));
+            if ($result === false || $result === 0) {
+                break;
+            }
+            $written_total += $result;
+        }
+        if ($written_total > 0) {
+            $this->pendingData = (string)substr($this->pendingData, $written_total);
+        }
+        flock($this->fileHandler, LOCK_UN);
+        if (!$this->isFileHandlerCurrent($file_name)) {
+            fclose($this->fileHandler);
+            $this->fileHandler = null;
+            $this->pendingData = $data;
+            TDLog::log("Log file was deleted or replaced while writing: $file_name, retry the complete batch on next flush");
+            return false;
+        }
+        if ($this->pendingData !== '') {
+            TDLog::log("Flush data failed after writing $written_total of $data_length bytes, keep the unwritten data in buffer");
+            return false;
+        }
+        $this->pendingCount = 0;
+        $this->pendingFileName = null;
+        return true;
+    }
+
+    /**
+     * Check whether the open handler still points to the file at the configured path.
+     * Log collectors may delete a file after reading it while this consumer still has
+     * the inode open. In that case writes succeed but are invisible from the directory.
+     *
+     * @param string $fileName
+     * @return bool
+     */
+    private function isFileHandlerCurrent($fileName)
+    {
+        if ($this->fileHandler === null || !is_resource($this->fileHandler)) {
+            return false;
+        }
+        clearstatcache(true, $fileName);
+        $pathStat = @stat($fileName);
+        $handlerStat = @fstat($this->fileHandler);
+        if ($pathStat === false || $handlerStat === false) {
+            return false;
+        }
+        if (isset($pathStat['dev'], $pathStat['ino'], $handlerStat['dev'], $handlerStat['ino']) &&
+            ($pathStat['ino'] != 0 || $handlerStat['ino'] != 0)) {
+            return $pathStat['dev'] == $handlerStat['dev'] &&
+                $pathStat['ino'] == $handlerStat['ino'];
         }
         return true;
     }
 
+    private function getPendingCount()
+    {
+        return $this->pendingCount + count($this->buffers);
+    }
+
     public function close()
     {
-        $this->flush();
+        $flush_result = $this->flush();
+        if (!$flush_result) {
+            TDLog::log("Flush failed on close, " . $this->getPendingCount() . " records dropped");
+        }
         TDLog::log("File consumer close");
         if ($this->fileHandler === null) {
             return false;
         }
-        return fclose($this->fileHandler);
+        return fclose($this->fileHandler) && $flush_result;
     }
 
     private function getFileName()
@@ -822,13 +926,19 @@ class TDBatchConsumer extends TDAbstractConsumer
     /**
      * Close consumer
      *
+     * @return bool
      * @throws ThinkingDataNetWorkException
      * @throws ThinkingDataException
      */
     public function close()
     {
-        $this->flush(true);
+        $flush_result = $this->flush(true);
+        if (!$flush_result) {
+            $left = count($this->buffers) + count($this->cacheBuffers);
+            TDLog::log("Flush failed on close, $left pending batches dropped");
+        }
         TDLog::log("Batch consumer close");
+        return $flush_result;
     }
 
     public function setCompress($compress = true)
@@ -975,8 +1085,13 @@ class TDDebugConsumer extends TDAbstractConsumer
         $this->writerData = $writer_data;
     }
 
+    /**
+     * Data is sent on every send(), so there is nothing buffered to release.
+     * @return bool
+     */
     public function close()
     {
+        return true;
     }
 
     /**
