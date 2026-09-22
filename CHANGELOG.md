@@ -1,10 +1,19 @@
+### v3.1.3
+**Date:** 2026/09/22
+
+**Notes:**
+
+* Keep file-consumer buffers retryable when log-file resolution or filesystem probes fail
+* Recover incomplete pending-file state instead of passing null paths to filesystem APIs
+* Fail fast when the configured log directory cannot be created
+* Report buffered records as unwritten instead of dropped when close-time flush fails
+
 ### v3.1.2
 **Date:** 2026/09/15
 
 **Notes:**
 
 * Improve the stability of the SDK
-
 
 ### v3.1.1
 **Date:** 2024/07/24
