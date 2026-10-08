@@ -3,7 +3,7 @@ namespace ThinkingData;
 use DateTime;
 use Exception;
 
-const SDK_VERSION = '3.1.3';
+const SDK_VERSION = '3.1.4';
 const SDK_LIB_NAME = 'tga_php_sdk';
 const TRACK_TYPE_NORMAL = 'track';
 const TRACK_TYPE_FIRST = 'track_first';
@@ -624,6 +624,24 @@ class TDFileConsumer extends TDAbstractConsumer
         $this->permission = TD_LOG_FILE_DEFAULT_PERMISSION;
         TDLog::log("File consumer init success. Log_directory:" . $file_directory);
         TDLog::$enable = false;
+    }
+
+    /**
+     * Best-effort fallback for callers that forget to close the consumer.
+     * Applications should still call close() explicitly so they can handle a
+     * failed flush. Destructors are not guaranteed to run on abnormal exits.
+     */
+    public function __destruct()
+    {
+        if ($this->fileHandler === null && $this->pendingData === '' && empty($this->buffers)) {
+            return;
+        }
+        try {
+            $this->close();
+        } catch (Exception $e) {
+            TDLog::log("File consumer destruct failed: " . $e->getMessage());
+            $this->closeFileHandler();
+        }
     }
 
     public function setLogFilePermission($permission)
