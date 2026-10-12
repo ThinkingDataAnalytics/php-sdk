@@ -3,7 +3,7 @@ namespace ThinkingData;
 use DateTime;
 use Exception;
 
-const SDK_VERSION = '3.1.4';
+const SDK_VERSION = '3.1.5';
 const SDK_LIB_NAME = 'tga_php_sdk';
 const TRACK_TYPE_NORMAL = 'track';
 const TRACK_TYPE_FIRST = 'track_first';
@@ -561,7 +561,9 @@ class FileConsumer extends TDFileConsumer {}
 
 
 /**
- * Write data to file, it works with LogBus. not support multiple thread
+ * Write data to file, it works with LogBus. not support multiple thread.
+ * Concurrent calls in a single-threaded cooperative coroutine runtime are
+ * serialized by a flush owner flag.
  */
 class TDFileConsumer extends TDAbstractConsumer
 {
@@ -574,9 +576,10 @@ class TDFileConsumer extends TDAbstractConsumer
     private $buffers;
     private $bufferSize;
     private $maxBufferSize;
-    private $pendingData;
-    private $pendingCount;
-    private $pendingFileName;
+    private $pendingBatch;
+    private $flushInProgress;
+    private $closeRequested;
+    private $closed;
     private $permission;
 
     /**
@@ -618,9 +621,10 @@ class TDFileConsumer extends TDAbstractConsumer
         $this->maxBufferSize = (int)$maxBufferSize > 0
             ? max($this->bufferSize, (int)$maxBufferSize)
             : $this->bufferSize * 10;
-        $this->pendingData = '';
-        $this->pendingCount = 0;
-        $this->pendingFileName = null;
+        $this->pendingBatch = null;
+        $this->flushInProgress = false;
+        $this->closeRequested = false;
+        $this->closed = false;
         $this->permission = TD_LOG_FILE_DEFAULT_PERMISSION;
         TDLog::log("File consumer init success. Log_directory:" . $file_directory);
         TDLog::$enable = false;
@@ -633,7 +637,8 @@ class TDFileConsumer extends TDAbstractConsumer
      */
     public function __destruct()
     {
-        if ($this->fileHandler === null && $this->pendingData === '' && empty($this->buffers)) {
+        if ($this->closed ||
+            ($this->fileHandler === null && $this->pendingBatch === null && empty($this->buffers))) {
             return;
         }
         try {
@@ -659,14 +664,33 @@ class TDFileConsumer extends TDAbstractConsumer
      */
     public function send($message)
     {
+        if ($this->closed || $this->closeRequested) {
+            TDLog::log("File consumer is closing or closed, reject new data");
+            return false;
+        }
         if ($this->getPendingCount() >= $this->maxBufferSize) {
-            if (!$this->flush() && $this->getPendingCount() >= $this->maxBufferSize) {
+            if (!$this->flushInProgress) {
+                $this->flush();
+            }
+            if ($this->getPendingCount() >= $this->maxBufferSize) {
                 TDLog::log("File consumer buffer is full, reject new data");
+                return false;
+            }
+            // A close request may have arrived while the capacity flush yielded
+            // in file IO. Do not enqueue into a consumer the flush owner closed.
+            if ($this->closed || $this->closeRequested) {
+                TDLog::log("File consumer is closing or closed, reject new data");
                 return false;
             }
         }
         $this->buffers[] = $message . "\n";
         if ($this->getPendingCount() >= $this->bufferSize) {
+            // The current flush owner will drain data appended while it performs
+            // hooked file IO. send() reports that the record was accepted; only
+            // an explicit flush() reports whether persistence has completed.
+            if ($this->flushInProgress) {
+                return true;
+            }
             return $this->flush();
         } else {
             TDLog::log("Enqueue data: $message");
@@ -680,64 +704,126 @@ class TDFileConsumer extends TDAbstractConsumer
      */
     public function flush()
     {
-        while ($this->pendingData !== '' || !empty($this->buffers)) {
-            if ($this->pendingData === '') {
-                if (!$this->preparePendingData()) {
-                    return false;
-                }
-            }
-            if (!$this->flushPendingData()) {
-                return false;
-            }
+        if ($this->closed) {
+            return true;
         }
-        return true;
+        if ($this->flushInProgress) {
+            // A concurrent explicit flush cannot truthfully claim that data has
+            // already been persisted by the current owner.
+            return false;
+        }
+        return $this->runFlushOwner(false);
     }
 
     /**
-     * Move the current buffer to pending state only after all operations which may
-     * fail have completed. pendingData is assigned last because a non-empty value
-     * means the pending state is ready for flushPendingData().
+     * Drain buffered data as the sole owner of pending state and the file handle.
+     * The final state transition contains no IO, so cooperative coroutines cannot
+     * enter between the last buffer check and releasing ownership.
+     *
+     * @param bool $closeAfterFlush
+     * @return bool
+     */
+    private function runFlushOwner($closeAfterFlush)
+    {
+        $this->flushInProgress = true;
+        $flush_result = true;
+        $close_result = true;
+
+        try {
+            while ($this->pendingBatch !== null || !empty($this->buffers)) {
+                if ($this->pendingBatch === null && !$this->preparePendingBatch()) {
+                    $flush_result = false;
+                    break;
+                }
+                if (!$this->flushPendingBatch()) {
+                    $flush_result = false;
+                    break;
+                }
+            }
+
+            if (($closeAfterFlush || $this->closeRequested) &&
+                $flush_result && $this->pendingBatch === null && empty($this->buffers)) {
+                $close_result = $this->closeFileHandler();
+                if ($close_result) {
+                    $this->closed = true;
+                    $this->closeRequested = false;
+                }
+            }
+        } finally {
+            $this->flushInProgress = false;
+        }
+
+        return $flush_result && $close_result;
+    }
+
+    /**
+     * Atomically detach complete records before performing file IO. New records
+     * can then be appended to buffers without being cleared by this operation.
      *
      * @return bool
      */
-    private function preparePendingData()
+    private function preparePendingBatch()
     {
         if (empty($this->buffers)) {
             return false;
         }
+
+        $records = $this->buffers;
+        $this->buffers = array();
+
         $file_name = $this->tryGetFileName();
         if ($file_name === false) {
+            // Keep the detached records ahead of records appended during IO.
+            $this->buffers = array_merge($records, $this->buffers);
             return false;
         }
-        $pending_data = join("", $this->buffers);
-        $pending_count = count($this->buffers);
 
-        $this->pendingFileName = $file_name;
-        $this->pendingCount = $pending_count;
-        $this->buffers = array();
-        $this->pendingData = $pending_data;
+        $this->pendingBatch = array(
+            'data' => join("", $records),
+            'offset' => 0,
+            'count' => count($records),
+            'file_name' => $file_name,
+            'file_dev' => null,
+            'file_ino' => null,
+        );
         return true;
     }
 
-    private function flushPendingData()
+    private function flushPendingBatch()
     {
-        $flush_cont = $this->pendingCount;
-        $file_name = $this->pendingFileName;
-        // Recover inconsistent pending state left by an interrupted flush or by
-        // an object created with an older SDK version.
+        if ($this->pendingBatch === null) {
+            return true;
+        }
+
+        $flush_cont = $this->pendingBatch['count'];
+        $file_name = $this->pendingBatch['file_name'];
+        // Recover an incomplete pending batch instead of passing an invalid path
+        // to filesystem APIs.
         if (!is_string($file_name) || $file_name === '') {
             $file_name = $this->tryGetFileName();
             if ($file_name === false) {
                 return false;
             }
-            $this->pendingFileName = $file_name;
+            $this->pendingBatch['file_name'] = $file_name;
         }
-        if ($this->fileHandler !== null &&
-            ($this->fileName != $file_name || !$this->isFileHandlerCurrent($file_name))) {
-            $this->closeFileHandler();
-            $this->fileName = $file_name;
+        if ($this->fileHandler !== null) {
+            $handler_targets_batch = $this->fileName == $file_name;
+            $handler_current = $handler_targets_batch && $this->isFileHandlerCurrent($file_name);
+            if (!$handler_current) {
+                $this->closeFileHandler();
+                if ($handler_targets_batch && $this->pendingBatch['offset'] > 0) {
+                    // A written prefix on a removed or replaced inode cannot be
+                    // assumed to exist at the configured path.
+                    $this->pendingBatch['offset'] = 0;
+                }
+                $this->fileName = $file_name;
+            }
         }
         if ($this->fileHandler === null) {
+            if ($this->pendingBatch['offset'] > 0 &&
+                !$this->isPendingFileIdentityCurrent($file_name)) {
+                $this->pendingBatch['offset'] = 0;
+            }
             try {
                 $file_exists = @file_exists($file_name);
                 $file_handler = @fopen($file_name, 'a+');
@@ -751,6 +837,7 @@ class TDFileConsumer extends TDAbstractConsumer
             }
             $this->fileHandler = $file_handler;
             $this->fileName = $file_name;
+            $this->rememberPendingFileIdentity();
             if (!$file_exists) {
                 try {
                     if (!@chmod($file_name, $this->permission)) {
@@ -772,12 +859,16 @@ class TDFileConsumer extends TDAbstractConsumer
             return false;
         }
         TDLog::log("Flush data, count: $flush_cont");
-        $data = $this->pendingData;
+        $data = $this->pendingBatch['data'];
         $data_length = strlen($data);
+        $offset_before_write = $this->pendingBatch['offset'];
         $written_total = 0;
-        while ($written_total < $data_length) {
+        while ($this->pendingBatch['offset'] < $data_length) {
             try {
-                $result = @fwrite($this->fileHandler, substr($data, $written_total));
+                $result = @fwrite(
+                    $this->fileHandler,
+                    substr($data, $this->pendingBatch['offset'])
+                );
             } catch (Exception $e) {
                 TDLog::log("Write log file failed: $file_name, " . $e->getMessage());
                 $result = false;
@@ -786,9 +877,7 @@ class TDFileConsumer extends TDAbstractConsumer
                 break;
             }
             $written_total += $result;
-        }
-        if ($written_total > 0) {
-            $this->pendingData = (string)substr($this->pendingData, $written_total);
+            $this->pendingBatch['offset'] += $result;
         }
         $handler_current = $this->isFileHandlerCurrent($file_name);
         try {
@@ -804,17 +893,72 @@ class TDFileConsumer extends TDAbstractConsumer
         }
         if (!$handler_current) {
             $this->closeFileHandler();
-            $this->pendingData = $data;
+            // The bytes written to the old inode may no longer be visible. Retry
+            // the complete immutable batch on the newly created path.
+            $this->pendingBatch['offset'] = 0;
             TDLog::log("Log file was deleted or replaced while writing: $file_name, retry the complete batch on next flush");
             return false;
         }
-        if ($this->pendingData !== '') {
-            TDLog::log("Flush data failed after writing $written_total of $data_length bytes, keep the unwritten data in buffer");
+        if ($this->pendingBatch['offset'] < $data_length) {
+            TDLog::log(
+                "Flush data failed after writing $written_total bytes from offset " .
+                "$offset_before_write of $data_length, keep the unwritten data in buffer"
+            );
             return false;
         }
-        $this->pendingCount = 0;
-        $this->pendingFileName = null;
+        $this->pendingBatch = null;
         return true;
+    }
+
+    /**
+     * Remember the inode which contains a partially written pending batch. This
+     * allows a later retry to distinguish reopening the same file from opening a
+     * replacement at the same path.
+     */
+    private function rememberPendingFileIdentity()
+    {
+        if ($this->pendingBatch === null ||
+            $this->fileHandler === null || !is_resource($this->fileHandler)) {
+            return;
+        }
+        try {
+            $handler_stat = @fstat($this->fileHandler);
+        } catch (Exception $e) {
+            return;
+        }
+        if ($handler_stat !== false && isset($handler_stat['dev'], $handler_stat['ino'])) {
+            $this->pendingBatch['file_dev'] = $handler_stat['dev'];
+            $this->pendingBatch['file_ino'] = $handler_stat['ino'];
+        }
+    }
+
+    /**
+     * @param string $fileName
+     * @return bool
+     */
+    private function isPendingFileIdentityCurrent($fileName)
+    {
+        if ($this->pendingBatch === null) {
+            return false;
+        }
+        try {
+            clearstatcache(true, $fileName);
+            $path_stat = @stat($fileName);
+        } catch (Exception $e) {
+            return false;
+        }
+        if ($path_stat === false) {
+            return false;
+        }
+        if (!isset($this->pendingBatch['file_dev'], $this->pendingBatch['file_ino']) ||
+            $this->pendingBatch['file_dev'] === null ||
+            $this->pendingBatch['file_ino'] === null) {
+            // Identity is unavailable (for example state produced by an older
+            // version). Preserve the offset to avoid duplicating a visible prefix.
+            return true;
+        }
+        return $path_stat['dev'] == $this->pendingBatch['file_dev'] &&
+            $path_stat['ino'] == $this->pendingBatch['file_ino'];
     }
 
     /**
@@ -896,17 +1040,31 @@ class TDFileConsumer extends TDAbstractConsumer
 
     private function getPendingCount()
     {
-        return $this->pendingCount + count($this->buffers);
+        $pending_count = $this->pendingBatch === null
+            ? 0
+            : (int)$this->pendingBatch['count'];
+        return $pending_count + count($this->buffers);
     }
 
     public function close()
     {
-        $flush_result = $this->flush();
-        if (!$flush_result) {
+        if ($this->closed) {
+            return true;
+        }
+        if ($this->flushInProgress) {
+            // The current owner will close the handle after draining all data.
+            // This invocation returns false because closure is not complete yet.
+            $this->closeRequested = true;
+            return false;
+        }
+
+        $this->closeRequested = true;
+        $close_result = $this->runFlushOwner(true);
+        if (!$close_result) {
             TDLog::log("Flush failed on close, " . $this->getPendingCount() . " records remain unwritten");
         }
         TDLog::log("File consumer close");
-        return $this->closeFileHandler() && $flush_result;
+        return $close_result;
     }
 
     private function getFileName()
@@ -1115,65 +1273,85 @@ class TDBatchConsumer extends TDAbstractConsumer
         $consoleMessages = implode(PHP_EOL, $message_array);
         TDLog::log("Send data, request: [\n$consoleMessages\n]");
 
-        $ch = curl_init($this->url);
-
-        curl_setopt($ch, CURLOPT_POST, 1);
-        curl_setopt($ch, CURLOPT_HEADER, 0);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 6);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-        curl_setopt($ch, CURLOPT_TIMEOUT, $this->requestTimeout);
-
         if ($this->compress) {
             $data = gzencode("[" . implode(", ", $message_array) . "]");
         } else {
             $data = "[" . implode(", ", $message_array) . "]";
         }
         $compressType = $this->compress ? "gzip" : "none";
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
-        //headers
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array("TA-Integration-Type:PHP", "TA-Integration-Version:" . SDK_VERSION,
-            "TA-Integration-Count:" . count($message_array), "appid:" . $this->appid, "compress:" . $compressType, 'Content-Type: text/plain'));
-
-        //https
-        $pos = strpos($this->url, "https");
-        if ($pos === 0) {
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        }
 
         // send request
         $curreyRetryTimes = 0;
+        $lastError = '';
         while ($curreyRetryTimes++ < $this->retryTimes) {
-            $result = curl_exec($ch);
-            TDLog::log("Send data, response: $result");
-
-            if (!$result) {
-                echo new ThinkingDataNetWorkException("Cannot post message to server , error --> " . curl_error(($ch)));
+            // A cURL handle must not be reused after curl_close(). Create one
+            // handle for each attempt so non-200 responses can be retried safely.
+            $ch = curl_init($this->url);
+            if ($ch === false) {
+                $lastError = "Cannot initialize cURL";
+                TDLog::log("Send data failed: $lastError");
                 continue;
             }
-            // parse data
-            $json = json_decode($result, true);
 
-            $curl_info = curl_getinfo($ch);
+            try {
+                curl_setopt($ch, CURLOPT_POST, 1);
+                curl_setopt($ch, CURLOPT_HEADER, 0);
+                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 6);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+                curl_setopt($ch, CURLOPT_TIMEOUT, $this->requestTimeout);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+                    "TA-Integration-Type:PHP",
+                    "TA-Integration-Version:" . SDK_VERSION,
+                    "TA-Integration-Count:" . count($message_array),
+                    "appid:" . $this->appid,
+                    "compress:" . $compressType,
+                    'Content-Type: text/plain'
+                ));
 
-            curl_close($ch);
-            if ($curl_info['http_code'] == 200) {
-                if ($json['code'] == 0) {
-                    return;
-                } else if ($json['code'] == -1) {
-                    throw new ThinkingDataException("data formatter is invalidated, code = -1");
-                } else if ($json['code'] == -2) {
-                    throw new ThinkingDataException("app id is invalidated, code = -2");
-                } else if ($json['code'] == -3) {
-                    throw new ThinkingDataException("ip is invalidated, code = -3");
-                } else {
-                    throw new ThinkingDataException("failed, code = " . $json['code']);
+                // https
+                $pos = strpos($this->url, "https");
+                if ($pos === 0) {
+                    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+                    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
                 }
-            } else {
-                echo new ThinkingDataNetWorkException("failed, http_code: " . $curl_info['http_code']);
+
+                $result = curl_exec($ch);
+                TDLog::log("Send data, response: $result");
+
+                if ($result === false) {
+                    $lastError = "Cannot post message to server, error --> " . curl_error($ch);
+                    TDLog::log("Send data failed: $lastError");
+                    continue;
+                }
+
+                // parse data
+                $json = json_decode($result, true);
+                $curl_info = curl_getinfo($ch);
+                if ($curl_info['http_code'] == 200) {
+                    if ($json['code'] == 0) {
+                        return;
+                    } else if ($json['code'] == -1) {
+                        throw new ThinkingDataException("data formatter is invalidated, code = -1");
+                    } else if ($json['code'] == -2) {
+                        throw new ThinkingDataException("app id is invalidated, code = -2");
+                    } else if ($json['code'] == -3) {
+                        throw new ThinkingDataException("ip is invalidated, code = -3");
+                    } else {
+                        throw new ThinkingDataException("failed, code = " . $json['code']);
+                    }
+                } else {
+                    $lastError = "failed, http_code: " . $curl_info['http_code'];
+                    TDLog::log("Send data failed: $lastError");
+                }
+            } finally {
+                curl_close($ch);
             }
         }
-        throw new ThinkingDataNetWorkException("retry " . $this->retryTimes . " times, but failed!");
+        $errorSuffix = $lastError === '' ? '' : " Last error: $lastError";
+        throw new ThinkingDataNetWorkException(
+            "retry " . $this->retryTimes . " times, but failed!" . $errorSuffix
+        );
     }
 }
 
